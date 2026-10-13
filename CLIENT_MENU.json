@@ -1,0 +1,885 @@
+[
+  {
+    "id": "cw-fried-chicken-wings-1-pc",
+    "name": "Fried Chicken Wings (1 Pc)",
+    "category": "Fried Chicken",
+    "price": 6000,
+    "available": true,
+    "image": 0,
+    "description": "",
+    "options": []
+  },
+  {
+    "id": "cw-fried-chicken-popcorn-5-pcs",
+    "name": "Fried Chicken Popcorn (5 Pcs)",
+    "category": "Fried Chicken",
+    "price": 6000,
+    "available": true,
+    "image": 0,
+    "description": "",
+    "options": []
+  },
+  {
+    "id": "cw-fried-chicken-lollipop-2-pcs",
+    "name": "Fried Chicken Lollipop (2 Pcs)",
+    "category": "Fried Chicken",
+    "price": 7000,
+    "available": true,
+    "image": 0,
+    "description": "",
+    "options": []
+  },
+  {
+    "id": "cw-fried-chicken-boneless-3-pcs",
+    "name": "Fried Chicken Boneless (3 Pcs)",
+    "category": "Fried Chicken",
+    "price": 8000,
+    "available": true,
+    "image": 0,
+    "description": "",
+    "options": []
+  },
+  {
+    "id": "cw-fried-chicken-leg-piece-1-pc",
+    "name": "Fried Chicken Leg Piece (1 Pc)",
+    "category": "Fried Chicken",
+    "price": 8000,
+    "available": true,
+    "image": 0,
+    "description": "",
+    "options": []
+  },
+  {
+    "id": "cw-mini-fried-chicken-shawarma",
+    "name": "Mini Fried Chicken Shawarma",
+    "category": "Shawarma",
+    "price": 7000,
+    "available": true,
+    "image": 1,
+    "description": "",
+    "options": []
+  },
+  {
+    "id": "cw-fried-chicken-shawarma",
+    "name": "Fried Chicken Shawarma",
+    "category": "Shawarma",
+    "price": 10000,
+    "available": true,
+    "image": 1,
+    "description": "",
+    "options": []
+  },
+  {
+    "id": "cw-fried-chicken-cone-shawarma",
+    "name": "Fried Chicken Cone Shawarma",
+    "category": "Shawarma",
+    "price": 10000,
+    "available": true,
+    "image": 1,
+    "description": "",
+    "options": []
+  },
+  {
+    "id": "cw-fried-chicken-cheese-shawarma",
+    "name": "Fried Chicken & Cheese Shawarma",
+    "category": "Shawarma",
+    "price": 12000,
+    "available": true,
+    "image": 1,
+    "description": "",
+    "options": []
+  },
+  {
+    "id": "cw-fried-chicken-plate-shawarma",
+    "name": "Fried Chicken Plate Shawarma",
+    "category": "Shawarma",
+    "price": 14000,
+    "available": true,
+    "image": 1,
+    "description": "",
+    "options": []
+  },
+  {
+    "id": "cw-fried-chicken-cheese-plate-shawarma",
+    "name": "Fried Chicken & Cheese Plate Shawarma",
+    "category": "Shawarma",
+    "price": 15000,
+    "available": true,
+    "image": 1,
+    "description": "",
+    "options": []
+  },
+  {
+    "id": "cw-classic-bread-omelette",
+    "name": "Classic Bread Omelette",
+    "category": "Bread Omelette",
+    "price": 6000,
+    "available": true,
+    "image": 2,
+    "description": "",
+    "options": []
+  },
+  {
+    "id": "cw-fried-chicken-bread-omelette",
+    "name": "Fried Chicken Bread Omelette",
+    "category": "Bread Omelette",
+    "price": 9000,
+    "available": true,
+    "image": 2,
+    "description": "",
+    "options": []
+  },
+  {
+    "id": "cw-peri-peri-fried-chicken-bread-omelette",
+    "name": "Peri Peri Fried Chicken Bread Omelette",
+    "category": "Bread Omelette",
+    "price": 10000,
+    "available": true,
+    "image": 2,
+    "description": "",
+    "options": []
+  },
+  {
+    "id": "cw-fried-chicken-cheese-bread-omelette",
+    "name": "Fried Chicken & Cheese Bread Omelette",
+    "category": "Bread Omelette",
+    "price": 12000,
+    "available": true,
+    "image": 2,
+    "description": "",
+    "options": []
+  },
+  {
+    "id": "cw-veg-sandwich",
+    "name": "Veg Sandwich",
+    "category": "Sandwich",
+    "price": 5000,
+    "available": true,
+    "image": 3,
+    "description": "",
+    "options": []
+  },
+  {
+    "id": "cw-chocolate-sandwich",
+    "name": "Chocolate Sandwich",
+    "category": "Sandwich",
+    "price": 6000,
+    "available": true,
+    "image": 3,
+    "description": "",
+    "options": []
+  },
+  {
+    "id": "cw-omelette-sandwich",
+    "name": "Omelette Sandwich",
+    "category": "Sandwich",
+    "price": 6000,
+    "available": true,
+    "image": 3,
+    "description": "",
+    "options": []
+  },
+  {
+    "id": "cw-mini-fried-chicken-sandwich",
+    "name": "Mini Fried Chicken Sandwich",
+    "category": "Sandwich",
+    "price": 6000,
+    "available": true,
+    "image": 3,
+    "description": "",
+    "options": []
+  },
+  {
+    "id": "cw-fried-chicken-sandwich",
+    "name": "Fried Chicken Sandwich",
+    "category": "Sandwich",
+    "price": 10000,
+    "available": true,
+    "image": 3,
+    "description": "",
+    "options": []
+  },
+  {
+    "id": "cw-peri-peri-fried-chicken-sandwich",
+    "name": "Peri Peri Fried Chicken Sandwich",
+    "category": "Sandwich",
+    "price": 10000,
+    "available": true,
+    "image": 3,
+    "description": "",
+    "options": []
+  },
+  {
+    "id": "cw-fried-chicken-cheese-sandwich",
+    "name": "Fried Chicken & Cheese Sandwich",
+    "category": "Sandwich",
+    "price": 12000,
+    "available": true,
+    "image": 3,
+    "description": "",
+    "options": []
+  },
+  {
+    "id": "cw-omelette-fried-chicken-sandwich",
+    "name": "Omelette & Fried Chicken Sandwich",
+    "category": "Sandwich",
+    "price": 12000,
+    "available": true,
+    "image": 3,
+    "description": "",
+    "options": []
+  },
+  {
+    "id": "cw-mini-fried-chicken-burger",
+    "name": "Mini Fried Chicken Burger",
+    "category": "Burger",
+    "price": 7000,
+    "available": true,
+    "image": 3,
+    "description": "",
+    "options": []
+  },
+  {
+    "id": "cw-fried-chicken-burger",
+    "name": "Fried Chicken Burger",
+    "category": "Burger",
+    "price": 10000,
+    "available": true,
+    "image": 3,
+    "description": "",
+    "options": []
+  },
+  {
+    "id": "cw-fried-chicken-cheese-burger",
+    "name": "Fried Chicken & Cheese Burger",
+    "category": "Burger",
+    "price": 12000,
+    "available": true,
+    "image": 3,
+    "description": "",
+    "options": []
+  },
+  {
+    "id": "cw-zinger-tandoori-fried-chicken-burger",
+    "name": "Zinger Tandoori Fried Chicken Burger",
+    "category": "Burger",
+    "price": 12000,
+    "available": true,
+    "image": 3,
+    "description": "",
+    "options": []
+  },
+  {
+    "id": "cw-spl-jumbo-burger",
+    "name": "Spl Jumbo Burger",
+    "category": "Burger",
+    "price": 15000,
+    "available": true,
+    "image": 3,
+    "description": "",
+    "options": []
+  },
+  {
+    "id": "cw-fried-chicken-pizza",
+    "name": "Fried Chicken Pizza",
+    "category": "Pizza",
+    "price": 17000,
+    "available": true,
+    "image": 4,
+    "description": "",
+    "options": []
+  },
+  {
+    "id": "cw-fully-loaded-fried-chicken",
+    "name": "Fully Loaded Fried Chicken",
+    "category": "Pizza",
+    "price": 14000,
+    "available": true,
+    "image": 4,
+    "description": "",
+    "options": []
+  },
+  {
+    "id": "cw-peri-peri-french-fries",
+    "name": "Peri Peri French Fries",
+    "category": "French Fries",
+    "price": 6000,
+    "available": true,
+    "image": 5,
+    "description": "",
+    "options": []
+  },
+  {
+    "id": "cw-lays-chicken",
+    "name": "Lays Chicken",
+    "category": "French Fries",
+    "price": 6000,
+    "available": true,
+    "image": 5,
+    "description": "",
+    "options": []
+  },
+  {
+    "id": "cw-mini-fried-chicken-rice",
+    "name": "Mini Fried Chicken Rice",
+    "category": "Fried Rice",
+    "price": 7000,
+    "available": true,
+    "image": 5,
+    "description": "",
+    "options": []
+  },
+  {
+    "id": "cw-veg-fried-rice",
+    "name": "Veg Fried Rice",
+    "category": "Fried Rice",
+    "price": 9000,
+    "available": true,
+    "image": 5,
+    "description": "",
+    "options": []
+  },
+  {
+    "id": "cw-egg-fried-rice",
+    "name": "Egg Fried Rice",
+    "category": "Fried Rice",
+    "price": 10000,
+    "available": true,
+    "image": 5,
+    "description": "",
+    "options": []
+  },
+  {
+    "id": "cw-fried-chicken-rice",
+    "name": "Fried Chicken Rice",
+    "category": "Fried Rice",
+    "price": 12000,
+    "available": true,
+    "image": 5,
+    "description": "",
+    "options": []
+  },
+  {
+    "id": "cw-schezwan-fried-chicken-rice",
+    "name": "Schezwan Fried Chicken Rice",
+    "category": "Fried Rice",
+    "price": 13000,
+    "available": true,
+    "image": 5,
+    "description": "",
+    "options": []
+  },
+  {
+    "id": "cw-bucket-fried-chicken-rice",
+    "name": "Bucket Fried Chicken Rice",
+    "category": "Fried Rice",
+    "price": 53000,
+    "available": true,
+    "image": 5,
+    "description": "",
+    "options": []
+  },
+  {
+    "id": "cw-mini-fried-chicken-noodles",
+    "name": "Mini Fried Chicken Noodles",
+    "category": "Noodles",
+    "price": 7000,
+    "available": true,
+    "image": 5,
+    "description": "",
+    "options": []
+  },
+  {
+    "id": "cw-veg-fried-noodles",
+    "name": "Veg Fried Noodles",
+    "category": "Noodles",
+    "price": 9000,
+    "available": true,
+    "image": 5,
+    "description": "",
+    "options": []
+  },
+  {
+    "id": "cw-egg-fried-noodles",
+    "name": "Egg Fried Noodles",
+    "category": "Noodles",
+    "price": 10000,
+    "available": true,
+    "image": 5,
+    "description": "",
+    "options": []
+  },
+  {
+    "id": "cw-fried-chicken-noodles",
+    "name": "Fried Chicken Noodles",
+    "category": "Noodles",
+    "price": 12000,
+    "available": true,
+    "image": 5,
+    "description": "",
+    "options": []
+  },
+  {
+    "id": "cw-schezwan-fried-chicken-noodles",
+    "name": "Schezwan Fried Chicken Noodles",
+    "category": "Noodles",
+    "price": 14000,
+    "available": true,
+    "image": 5,
+    "description": "",
+    "options": []
+  },
+  {
+    "id": "cw-bucket-fried-chicken-noodles",
+    "name": "Bucket Fried Chicken Noodles",
+    "category": "Noodles",
+    "price": 53000,
+    "available": true,
+    "image": 5,
+    "description": "",
+    "options": []
+  },
+  {
+    "id": "cw-pepper-chicken-gravy",
+    "name": "Pepper Chicken Gravy",
+    "category": "Gravy",
+    "price": 18000,
+    "available": true,
+    "image": 5,
+    "description": "",
+    "options": []
+  },
+  {
+    "id": "cw-butter-chicken-gravy",
+    "name": "Butter Chicken Gravy",
+    "category": "Gravy",
+    "price": 20000,
+    "available": true,
+    "image": 5,
+    "description": "",
+    "options": []
+  },
+  {
+    "id": "cw-chilli-chicken-gravy",
+    "name": "Chilli Chicken Gravy",
+    "category": "Gravy",
+    "price": 20000,
+    "available": true,
+    "image": 5,
+    "description": "",
+    "options": []
+  },
+  {
+    "id": "cw-plain-naan",
+    "name": "Plain Naan",
+    "category": "Naan",
+    "price": 3000,
+    "available": true,
+    "image": 5,
+    "description": "",
+    "options": []
+  },
+  {
+    "id": "cw-butter-naan",
+    "name": "Butter Naan",
+    "category": "Naan",
+    "price": 5000,
+    "available": true,
+    "image": 5,
+    "description": "",
+    "options": []
+  },
+  {
+    "id": "cw-full-grill-or-bbq",
+    "name": "Full Grill (or) BBQ",
+    "category": "Grill / BBQ",
+    "price": 40000,
+    "available": true,
+    "image": 5,
+    "description": "Full portion",
+    "options": [
+      {
+        "name": "Grill or BBQ",
+        "values": [
+          "Grill",
+          "BBQ"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "cw-half-grill-or-bbq",
+    "name": "Half Grill (or) BBQ",
+    "category": "Grill / BBQ",
+    "price": 20000,
+    "available": true,
+    "image": 5,
+    "description": "Half portion",
+    "options": [
+      {
+        "name": "Grill or BBQ",
+        "values": [
+          "Grill",
+          "BBQ"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "cw-pepper-bbq-full",
+    "name": "Pepper BBQ Full",
+    "category": "Grill / BBQ",
+    "price": 42000,
+    "available": true,
+    "image": 5,
+    "description": "",
+    "options": []
+  },
+  {
+    "id": "cw-pepper-bbq-half",
+    "name": "Pepper BBQ Half",
+    "category": "Grill / BBQ",
+    "price": 22000,
+    "available": true,
+    "image": 5,
+    "description": "",
+    "options": []
+  },
+  {
+    "id": "cw-popcorn-bucket",
+    "name": "Popcorn Bucket",
+    "category": "Buckets",
+    "price": 10000,
+    "available": true,
+    "image": 6,
+    "description": "Fried Chicken Popcorn (10 Pcs)",
+    "options": []
+  },
+  {
+    "id": "cw-boneless-bucket",
+    "name": "Boneless Bucket",
+    "category": "Buckets",
+    "price": 16000,
+    "available": true,
+    "image": 6,
+    "description": "Fried Chicken Boneless (7 Pcs)",
+    "options": []
+  },
+  {
+    "id": "cw-lollipop-bucket",
+    "name": "Lollipop Bucket",
+    "category": "Buckets",
+    "price": 17000,
+    "available": true,
+    "image": 6,
+    "description": "Fried Chicken Lollipop (6 Pcs)",
+    "options": []
+  },
+  {
+    "id": "cw-wings-bucket",
+    "name": "Wings Bucket",
+    "category": "Buckets",
+    "price": 20000,
+    "available": true,
+    "image": 6,
+    "description": "Fried Chicken Wings (4 Pcs)",
+    "options": []
+  },
+  {
+    "id": "cw-leg-piece-bucket",
+    "name": "Leg Piece Bucket",
+    "category": "Buckets",
+    "price": 20000,
+    "available": true,
+    "image": 6,
+    "description": "Fried Chicken Leg Piece (3 Pcs)",
+    "options": []
+  },
+  {
+    "id": "cw-small-bucket",
+    "name": "Small Bucket",
+    "category": "Buckets",
+    "price": 20000,
+    "available": true,
+    "image": 6,
+    "description": "Fried Chicken Popcorn (10 Pcs) + Fried Chicken Boneless (5 Pcs)",
+    "options": []
+  },
+  {
+    "id": "cw-large-bucket",
+    "name": "Large Bucket",
+    "category": "Buckets",
+    "price": 30000,
+    "available": true,
+    "image": 6,
+    "description": "Fried Chicken Leg Piece (2 Pcs) + Fried Chicken Wings (2 Pcs) + Fried Chicken Lollipop (2 Pcs)",
+    "options": []
+  },
+  {
+    "id": "cw-butter-naan-pepper-chicken-gravy-combo",
+    "name": "Butter Naan & Pepper Chicken Gravy Combo",
+    "category": "Naan Combo",
+    "price": 20000,
+    "available": true,
+    "image": 5,
+    "description": "Butter Naan (1 set) + Pepper Chicken Gravy",
+    "options": []
+  },
+  {
+    "id": "cw-students-combo",
+    "name": "Students Combo",
+    "category": "Combos",
+    "price": 12000,
+    "available": true,
+    "image": 5,
+    "description": "Mini Shawarma + Mini Fried Chicken Rice (or) Noodles",
+    "options": [
+      {
+        "name": "Mini rice or noodles",
+        "values": [
+          "Mini Rice",
+          "Mini Noodles"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "cw-kids-combo",
+    "name": "Kids Combo",
+    "category": "Combos",
+    "price": 12000,
+    "available": true,
+    "image": 5,
+    "description": "Fried Chicken Popcorn (5 Pcs) + Mini Fried Chicken Rice (or) Noodles",
+    "options": [
+      {
+        "name": "Mini rice or noodles",
+        "values": [
+          "Mini Rice",
+          "Mini Noodles"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "cw-90-s-combo",
+    "name": "90’s Combo",
+    "category": "Combos",
+    "price": 17000,
+    "available": true,
+    "image": 5,
+    "description": "Fried Chicken Sandwich + Fried Chicken Rice (or) Noodles",
+    "options": [
+      {
+        "name": "Rice or noodles",
+        "values": [
+          "Rice",
+          "Noodles"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "cw-2k-combo",
+    "name": "2k Combo",
+    "category": "Combos",
+    "price": 17000,
+    "available": true,
+    "image": 5,
+    "description": "Fried Chicken Burger + Fried Chicken Shawarma",
+    "options": []
+  },
+  {
+    "id": "cw-quick-combo",
+    "name": "Quick Combo",
+    "category": "Combos",
+    "price": 28000,
+    "available": true,
+    "image": 5,
+    "description": "Fried Chicken Burger + Fried Chicken Shawarma + Fried Chicken Rice (or) Noodles",
+    "options": [
+      {
+        "name": "Rice or noodles",
+        "values": [
+          "Rice",
+          "Noodles"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "cw-cheese-combo",
+    "name": "Cheese Combo",
+    "category": "Combos",
+    "price": 40000,
+    "available": true,
+    "image": 5,
+    "description": "Fried Chicken & Cheese Bread Omelette + Fried Chicken & Cheese Burger + Fried Chicken & Cheese Sandwich + Fried Chicken & Cheese Shawarma",
+    "options": []
+  },
+  {
+    "id": "cw-warrier-combo",
+    "name": "Warrier Combo",
+    "category": "Combos",
+    "price": 46000,
+    "available": true,
+    "image": 5,
+    "description": "Fried Chicken Bread Omelette + Fried Chicken Burger + Fried Chicken Sandwich + Fried Chicken Shawarma + Fried Chicken Rice (or) Noodles",
+    "options": [
+      {
+        "name": "Rice or noodles",
+        "values": [
+          "Rice",
+          "Noodles"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "cw-birthday-combo-top-load",
+    "name": "Birthday Combo — Top Load",
+    "category": "Birthday Combos",
+    "price": 100000,
+    "available": true,
+    "image": 5,
+    "description": "Full Grill (or) BBQ (1) + Fried Chicken Shawarma (2) + Fried Chicken Burger (2) + Fried Chicken Sandwich (2) + Rice (or) Noodles (2)",
+    "options": [
+      {
+        "name": "Grill or BBQ",
+        "values": [
+          "Grill",
+          "BBQ"
+        ]
+      },
+      {
+        "name": "First rice/noodles",
+        "values": [
+          "Rice",
+          "Noodles"
+        ]
+      },
+      {
+        "name": "Second rice/noodles",
+        "values": [
+          "Rice",
+          "Noodles"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "cw-birthday-combo-medium-load",
+    "name": "Birthday Combo — Medium Load",
+    "category": "Birthday Combos",
+    "price": 54000,
+    "available": true,
+    "image": 5,
+    "description": "Half Grill (or) BBQ (1) + Fried Chicken Shawarma (1) + Fried Chicken Burger (1) + Fried Chicken Sandwich (1) + Rice (or) Noodles (1)",
+    "options": [
+      {
+        "name": "Grill or BBQ",
+        "values": [
+          "Grill",
+          "BBQ"
+        ]
+      },
+      {
+        "name": "Rice or noodles",
+        "values": [
+          "Rice",
+          "Noodles"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "cw-birthday-combo-low-load",
+    "name": "Birthday Combo — Low Load",
+    "category": "Birthday Combos",
+    "price": 20000,
+    "available": true,
+    "image": 5,
+    "description": "Quarter Grill (or) BBQ (1) + Mini Rice (or) Noodles (1) + Mini Shawarma (or) Burger (1)",
+    "options": [
+      {
+        "name": "Grill or BBQ",
+        "values": [
+          "Grill",
+          "BBQ"
+        ]
+      },
+      {
+        "name": "Mini rice or noodles",
+        "values": [
+          "Mini Rice",
+          "Mini Noodles"
+        ]
+      },
+      {
+        "name": "Mini main",
+        "values": [
+          "Mini Shawarma",
+          "Mini Burger"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "cw-birthday-combo-veg-load",
+    "name": "Birthday Combo — Veg Load",
+    "category": "Birthday Combos",
+    "price": 25000,
+    "available": true,
+    "image": 5,
+    "description": "Mojito (1) + Veg Sandwich (1) + Veg Rice (or) Noodles (1) + French Fries (1)",
+    "options": [
+      {
+        "name": "Veg rice or noodles",
+        "values": [
+          "Veg Rice",
+          "Veg Noodles"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "cw-virgin-mojito",
+    "name": "Virgin Mojito",
+    "category": "Final Touch",
+    "price": 6000,
+    "available": true,
+    "image": 5,
+    "description": "",
+    "options": []
+  },
+  {
+    "id": "cw-green-apple-mojito",
+    "name": "Green Apple Mojito",
+    "category": "Final Touch",
+    "price": 6000,
+    "available": true,
+    "image": 5,
+    "description": "",
+    "options": []
+  },
+  {
+    "id": "cw-blue-curracao-mojito",
+    "name": "Blue Curracao Mojito",
+    "category": "Final Touch",
+    "price": 7000,
+    "available": true,
+    "image": 5,
+    "description": "",
+    "options": []
+  },
+  {
+    "id": "cw-mint-flavour-mojito",
+    "name": "Mint Flavour Mojito",
+    "category": "Final Touch",
+    "price": 7000,
+    "available": true,
+    "image": 5,
+    "description": "",
+    "options": []
+  }
+]

@@ -1,0 +1,1 @@
+export function totals(cart, products, discount=0, taxRate=0){const subtotal=cart.reduce((sum,line)=>sum+products.find(p=>p.id===line.id).price*line.qty,0);const reduction=Math.min(subtotal,Math.max(0,Math.round(discount)));const tax=Math.round((subtotal-reduction)*taxRate/100);return {subtotal,discount:reduction,tax,total:subtotal-reduction+tax};}

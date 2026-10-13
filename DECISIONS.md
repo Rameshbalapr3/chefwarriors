@@ -1,0 +1,15 @@
+# Implementation decisions
+
+- The user's attached screenshot controls the visual direction: dark navy panels and warm yellow actions. This intentionally differs from the guide's light-theme suggestion.
+- Scope is one prepaid counter. Inventory, customers/loyalty, supplier accounting, online orders and postpaid incremental KOTs are excluded as the guide specifies, even though the reference image shows additional navigation.
+- Browser storage is a labelled demo adapter; it is not durable business storage. Demo totals derive from actual saved demo orders, with no invented historic revenue.
+- Currency is integer paise. Discount is a fixed amount, tax is exclusive after discount and disabled initially; rounding is explicit. Tax configuration is a client decision.
+- Electron is pinned by package-lock.json to 42.11.12. It uses bundled Node's `node:sqlite`, so no third-party SQLite native ABI rebuild is needed. Node 24 development and actual Electron execution are tested separately.
+- Official compatibility references checked during implementation: https://www.electronjs.org/blog/electron-42-0, https://www.electronjs.org/docs/latest/tutorial/installation, https://nodejs.org/api/sqlite.html. Provisional Windows x64 only; the client OS remains unknown.
+- Electron printer behavior follows https://www.electronjs.org/docs/latest/api/web-contents/. Spooler acceptance is labelled submitted, never proof of physical printing. Ambiguous callback failures are unknown. Missing printer assignments are failed and retryable.
+- Persisted order documents are immutable snapshots. State and cancellation reason may change, but editing live menu/settings cannot change historic receipt data. SQLite uses separate constrained orders, payments and print-job tables, with menu/settings metadata and snapshots stored as JSON. This is simpler than the guide's suggested fully normalized table layout.
+- Print attempts are retained in job payloads inside SQLite. Original jobs share a transaction with order/invoice/payment creation. Explicit copies get new job IDs and an audit reason, retaining the order reference. Interrupted and restored uncertain jobs require review.
+- No default production credentials. Scrypt uses random salt, N=32768, r=8, p=1. Setup is allowed only before any user exists; five failed login attempts impose a one-minute in-process delay. Filesystem/Windows account protection remains part of installation.
+- One schema version exists. The startup backup protects version 1 installations; future migration code must create a pre-migration backup before modifying schema. Newer versions are rejected. Installer-upgrade acceptance cannot be established without a previous released installer and actual client hardware.
+- Unknown jobs are never automatically replayed. Queued jobs left by a crash can be retried deliberately from history. Cancellation changes accounting; the prepaid version requires the operator to notify the kitchen directly.
+- Installer is unsigned. No OS security controls are bypassed. Support contact, signing certificate, client identity and actual drivers must be supplied by the owner.

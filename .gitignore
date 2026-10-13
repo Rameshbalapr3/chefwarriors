@@ -1,0 +1,7 @@
+node_modules/
+dist/
+dist-desktop/
+release/
+test-results/
+*.sqlite*
+*.log
