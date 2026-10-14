@@ -1,10 +1,42 @@
-import {useRef,useState} from 'react';
+import {useLayoutEffect,useMemo,useRef,useState} from 'react';
 import {Printer,Minus,Plus} from 'lucide-react';
 import {money,type Job,type Order} from '../domain/model';
 import {receiptHtml} from '../domain/receipt';
 
 type Props={order:Order;jobs:Job[];kind:'counter'|'kitchen';copy?:boolean;admin:boolean;select:(kind:'counter'|'kitchen',copy:boolean)=>void;print:(id:string)=>Promise<void>;review:(job:Job)=>void};
 const labels:Record<Job['state'],string>={queued:'Ready to send',submitting:'Sending…',submitted:'Submitted to printer',failed:'Failed to send',unknown:'Check physical printer',preview:'Demo preview'};
+function ReceiptPaper({order,kind,copy,zoom}:{order:Order;kind:'counter'|'kitchen';copy:boolean;zoom:number}){
+ const host=useRef<HTMLDivElement>(null);
+ const [paper,setPaper]=useState({fit:1,width:0,height:0});
+ const html=useMemo(()=>receiptHtml(order,kind,copy),[order,kind,copy]);
+ useLayoutEffect(()=>{
+  const node=host.current!;
+  const root=node.shadowRoot||node.attachShadow({mode:'open'});
+  // Use the same escaped document as the printer, with isolated styles and no frame navigation.
+  const document=new DOMParser().parseFromString(html,'text/html');
+  const style=document.querySelector('style')!;
+  style.textContent=style.textContent!.replace('body{',':host{color-scheme:light} .receipt-body{');
+  const body=document.createElement('div');body.className='receipt-body';
+  body.append(...document.body.childNodes);
+  root.replaceChildren(style,body);
+  const container=node.parentElement!.parentElement!;
+  const resize=()=>{
+   // Transforms never change these natural dimensions. Scrollbar appearance must
+   // not alter the fitting target either, including when the user zooms in.
+   const bounds=container.getBoundingClientRect();
+   const width=node.offsetWidth,height=node.offsetHeight;
+   const availableWidth=bounds.width-44,availableHeight=bounds.height-28;
+   if(width&&height&&availableWidth>0&&availableHeight>0){
+    const fit=Math.floor(Math.min(1.5,availableWidth/width,availableHeight/height)*1000)/1000;
+    setPaper(old=>old.fit===fit&&old.width===width&&old.height===height?old:{fit,width,height});
+   }
+  };
+  const observer=new ResizeObserver(resize);observer.observe(container);observer.observe(node);resize();
+  return()=>observer.disconnect();
+ },[html]);
+ const scale=paper.fit*zoom;
+ return <div className="receipt-paper-frame" style={{width:paper.width*scale,height:paper.height*scale}}><div ref={host} className="receipt-paper" role="document" aria-label={kind==='counter'?'Customer receipt preview':'Price-free kitchen ticket preview'} style={{width:`${order.settings.width}mm`,transform:`scale(${scale})`}}/></div>;
+}
 export function PrintPreview({order,jobs,kind,copy=false,admin,select,print,review}:Props){
  const [zoom,setZoom]=useState(1),[busy,setBusy]=useState<string|null>(null),[error,setError]=useState('');const lock=useRef(false);
  const queue=jobs.filter(j=>j.orderId===order.id);
@@ -15,7 +47,7 @@ export function PrintPreview({order,jobs,kind,copy=false,admin,select,print,revi
   <p className="print-mode-note">Submitted means accepted by the print system. Check the paper output before requesting another copy.</p>
   {order.state==='cancelled'&&<p className="print-cancelled-note">Cancelled order{order.reason?`: ${order.reason}`:'.'} Do not prepare this order.</p>}
   {error&&<p className="error" role="alert">{error}</p>}
-  <div className="document-workspace"><section className="document-pane" aria-label="Receipt preview"><div className="document-preview-toolbar"><div><b>{kind==='counter'?'Customer bill':'Kitchen ticket'}</b><small>{order.settings.width} mm · {copy?'Reprint copy':'Original'}{kind==='kitchen'?' · Prices hidden':''}</small></div><div className="document-zoom"><button aria-label="Zoom out receipt" disabled={zoom<=.75} onClick={()=>setZoom(z=>Math.max(.75,z-.25))}><Minus size={18}/></button><span>{Math.round(zoom*100)}%</span><button aria-label="Zoom in receipt" disabled={zoom>=2} onClick={()=>setZoom(z=>Math.min(2,z+.25))}><Plus size={18}/></button></div></div><div className="document-paper-scroll"><iframe title={kind==='counter'?'Customer receipt preview':'Price-free kitchen ticket preview'} sandbox="" srcDoc={receiptHtml(order,kind,copy)} style={{width:`${order.settings.width}mm`,height:'65vh',zoom}}/></div><small className="document-screen-note">Zoom changes the screen preview only. Printed paper size stays the same.</small></section>
+  <div className="document-workspace"><section className="document-pane" aria-label="Receipt preview"><div className="document-preview-toolbar"><div><b>{kind==='counter'?'Customer bill':'Kitchen ticket'}</b><small>{order.settings.width} mm · {copy?'Reprint copy':'Original'}{kind==='kitchen'?' · Prices hidden':''}</small></div><div className="document-zoom"><button aria-label="Zoom out receipt" disabled={zoom<=.75} onClick={()=>setZoom(z=>Math.max(.75,z-.25))}><Minus size={18}/></button><button className="document-fit" onClick={()=>setZoom(1)} title="Fit the whole receipt">{zoom===1?'Fit':Math.round(zoom*100)+'%'}</button><button aria-label="Zoom in receipt" disabled={zoom>=2} onClick={()=>setZoom(z=>Math.min(2,z+.25))}><Plus size={18}/></button></div></div><div className="document-paper-scroll"><ReceiptPaper order={order} kind={kind} copy={copy} zoom={zoom}/></div><small className="document-screen-note">Zoom changes the screen preview only. Printed paper size stays the same.</small></section>
    <section className="document-queue" aria-label="Print queue"><h3>Print queue <span>{queue.length}</span></h3><p>Each document has its own status and retry action.</p>{queue.map(job=>{const retryable=job.state==='queued'||job.state==='failed',attention=job.state==='failed'||job.state==='unknown';return <article className={`document-job${attention?' needs-attention':''}`} key={job.id}><div className="document-job-heading"><b>{job.kind==='counter'?'Customer bill':'Kitchen ticket'}</b><span>{job.copy?'COPY':'ORIGINAL'}</span></div><span className={`badge ${['submitted','preview'].includes(job.state)?'good':attention?'bad':''}`}>{busy===job.id?'Sending…':labels[job.state]}</span><p className="document-printer"><Printer size={16}/>{job.printer||'No printer assigned'}</p>{job.state==='unknown'&&<p className="document-job-warning">Output is uncertain. Check the printer before requesting a copy.</p>}{!job.printer&&<p className="document-job-warning">Assign this printer in Settings before retrying.</p>}{job.reason&&<p className="document-job-reason">Copy reason: {job.reason}</p>}<div className="document-job-actions"><button onClick={()=>select(job.kind,job.copy)}>View {job.copy?'copy':'original'}</button><button disabled={!!busy||job.state==='submitting'||(!retryable&&!admin)} title={!retryable&&!admin?'Administrator access is required for reprints':undefined} onClick={()=>{if(retryable)void retry(job.id);else review(job);}}>{job.state==='submitting'?'Sending…':retryable?job.state==='queued'?'Send document':'Retry document':'Review & reprint'}</button></div>{job.attempts.length>0&&<details className="document-attempts"><summary>Submission history ({job.attempts.length})</summary><ol>{job.attempts.map((attempt,index)=><li key={index}><time>{new Date(attempt.at).toLocaleString('en-IN')}</time><span>{attempt.outcome}</span></li>)}</ol></details>}</article>;})}{!queue.length&&<p>No print jobs are recorded for this order.</p>}</section>
   </div>
  </div>;

@@ -174,14 +174,6 @@
 .billing-products .product-bottom{padding-top:5px;gap:8px}
 .billing-products .product-bottom strong{font-size:17px}
 .billing-products .add{display:inline-flex;align-items:center;gap:4px;padding:5px 8px;min-height:30px;font-size:11px;border-radius:7px}
-.popular-section{margin-bottom:16px}
-.popular-section h2{display:flex;align-items:center;justify-content:space-between;font-size:13px;gap:8px;margin-bottom:8px}
-.popular-section h2 small{font-size:10px;color:var(--muted);font-weight:400}
-.popular-items{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
-.popular-items button{justify-content:flex-start;min-height:44px;background:#211e13;border-color:#453b20;padding:8px 10px;text-align:left;gap:8px;font-size:11px}
-.popular-items button span{flex:1;min-width:0;overflow-wrap:anywhere}
-.popular-items button strong{color:var(--yellow);white-space:nowrap}
-.popular-items button svg{flex-shrink:0;color:var(--yellow)}
 .order-panel .cart-item{padding:10px 13px}
 .order-panel .cart-item-top{font-size:14px;gap:8px}
 .order-panel .cart-item-top b{line-height:1.4}
@@ -231,7 +223,6 @@
 .billing-shell .product-bottom strong{font-size:clamp(1.1rem,.95rem + .3vw,1.65rem)}
 .billing-shell .billing-categories{max-height:9rem;scrollbar-width:thin}
 .billing-shell .billing-categories button{min-height:44px;white-space:normal}
-.billing-shell .popular-items{grid-template-columns:repeat(auto-fit,minmax(min(100%,13rem),1fr))}
 .billing-shell .order-heading,.billing-shell .order-details{flex-wrap:wrap;gap:.6rem}
 .billing-shell .order-heading h2{font-size:clamp(1.15rem,1rem + .2vw,1.6rem)}
 .billing-shell .segmented{flex:1 1 auto}
@@ -243,6 +234,7 @@
 .billing-shell .cart-item-bottom .stepper button{min-width:44px;min-height:44px}
 .billing-shell .payments{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
 .billing-shell .payments button{min-width:0;flex-wrap:wrap;min-height:44px}
+.billing-shell .checkout-button{display:flex;margin-top:clamp(12px,.75em,24px)}
 .billing-shell .cash-entry-top,.billing-shell .change-due{flex-wrap:wrap}
 .billing-shell .cash-entry-values{grid-template-columns:repeat(2,minmax(0,1fr))}
 .billing-shell .cash-entry-values input{width:100%;min-width:0;min-height:44px}
@@ -251,7 +243,7 @@
 .billing-shell .print-status-title{flex-wrap:wrap}
 .billing-shell .workspace-footer{display:none}
 @media(min-width:801px){
-  .billing-shell{height:100dvh;display:flex;flex-direction:column;overflow:hidden}
+  .billing-shell{position:fixed;inset:0;height:100dvh;display:flex;flex-direction:column;overflow:hidden}
   .billing-shell .topbar{flex-shrink:0}
   .billing-shell .workspace{display:flex;flex-direction:column;flex:1;min-height:0}
   .billing-shell .billing-layout{flex:1;min-height:0;grid-template-columns:minmax(0,1.85fr) minmax(0,1fr)}
@@ -261,22 +253,24 @@
   .billing-shell .order-scroll{display:flex;flex-direction:column;overflow:hidden;flex:1;min-height:0}
   .billing-shell .order-heading,.billing-shell .order-details,.billing-shell .cart-head{flex-shrink:0}
   .billing-shell .order-scroll .cart-items{flex:1;min-height:0;overflow-y:auto}
-  .billing-shell .checkout-actions{max-height:70%;overflow-y:auto;scrollbar-width:thin}
+  .billing-shell .checkout-actions{max-height:none;overflow:visible}
+  .billing-shell .billing-categories{max-height:none;overflow:visible}
   .billing-shell .banner{flex-shrink:0;margin-bottom:8px}
 }
 @media(min-width:801px) and (max-width:1100px){
   .billing-shell .billing-layout{grid-template-columns:minmax(0,1.2fr) minmax(0,1fr)}
   .topbar .profile{margin-left:auto}
 }
-/* At high zoom or in landscape, allow page scrolling without moving the order below the menu. */
+/* Compact short counters while keeping the menu as the page's scroll region. */
 @media(min-width:801px) and (max-height:700px){
-  .billing-shell{height:auto;min-height:100dvh;overflow:visible}
-  .billing-shell .billing-layout{align-items:start}
-  .billing-shell .menu-area,.billing-shell .order-panel{height:auto;min-height:0}
-  .billing-shell .menu-products-scroll{flex:none;max-height:75dvh;overflow-y:auto}
-  .billing-shell .order-scroll{flex:none;overflow:visible}
-  .billing-shell .order-scroll .cart-items{flex:none;max-height:35dvh;overflow-y:auto}
-  .billing-shell .checkout-actions{max-height:none;overflow:visible}
+  .billing-shell .topbar{min-height:64px;padding-block:6px}
+  .billing-shell .section-heading{margin-bottom:8px}
+  .billing-shell .section-heading h1{font-size:20px;margin-top:3px}
+  .billing-shell .billing-categories{gap:5px;margin-bottom:8px}
+  .billing-shell .billing-categories button{min-height:32px;padding:5px 8px;font-size:11px}
+  .billing-shell .order-heading,.billing-shell .order-details{padding:8px 12px}
+  .billing-shell .order-adjustments summary{min-height:28px}
+  .billing-shell .grand-total{padding:4px 0}
 }
 @media(max-width:800px){
   .topbar{padding:.75rem;min-height:0}
@@ -302,14 +296,13 @@
 }
 @media(max-width:420px){
   .billing-shell .billing-products{grid-template-columns:minmax(0,1fr)}
-  .billing-shell .popular-items{grid-template-columns:minmax(0,1fr)}
   .billing-shell .cash-entry-values{grid-template-columns:minmax(0,1fr)}
   .billing-shell .change-due{justify-content:space-between}
 }
 
 /* Scale the entire counter UI on large desktops, not just the grid width. */
 @media(min-width:1600px){
-  .billing-shell{--pos-unit:clamp(16px,1vw,48px);--billing-gap:var(--pos-unit);font-size:var(--pos-unit)}
+  .billing-shell{--pos-unit:clamp(14px,min(1vw,1.8dvh),48px);--billing-gap:var(--pos-unit);font-size:var(--pos-unit)}
   .billing-shell .topbar,.billing-shell .workspace{margin-left:calc(var(--pos-unit)*4.8)}
   .billing-shell.nav-expanded .topbar,.billing-shell.nav-expanded .workspace{margin-left:calc(var(--pos-unit)*13)}
   .billing-shell .sidebar{width:calc(var(--pos-unit)*4.8);padding:.75em .5em}
@@ -334,7 +327,7 @@
   .billing-shell .section-heading h1{font-size:1.6em}
   .billing-shell .section-heading small,.billing-shell .section-heading>.muted{font-size:.8em}
   .billing-shell .section-heading{margin-bottom:.7em}
-  .billing-shell .billing-categories{max-height:8em;gap:.4em;margin-bottom:.75em}
+  .billing-shell .billing-categories{max-height:none;gap:.4em;margin-bottom:.75em}
   .billing-shell .billing-categories button{font-size:.85em;padding:.65em .8em;min-height:2.6em;border-radius:.6em}
   .billing-shell .billing-products{grid-template-columns:repeat(4,minmax(0,1fr))}
   .billing-shell .menu-product{font-size:1em;padding:.85em;gap:.75em;min-height:11em;border-radius:.8em}
@@ -345,9 +338,6 @@
   .billing-shell .billing-products .product-description{font-size:.75em;max-height:2.8em}
   .billing-shell .product-bottom strong{font-size:1.3em}
   .billing-shell .billing-products .add{font-size:.8em;min-height:2.6em;padding:.5em .7em;border-radius:.5em}
-  .billing-shell .popular-section h2{font-size:1em}
-  .billing-shell .popular-section h2 small{font-size:.75em}
-  .billing-shell .popular-items button{font-size:.85em;padding:.7em;min-height:3em}
   .billing-shell .order-heading{padding:.8em 1em}
   .billing-shell .order-heading h2{font-size:1.3em}
   .billing-shell .order-heading h2 span{font-size:.65em;padding:.35em .55em}
@@ -644,7 +634,7 @@ dialog.print-preview-dialog{width:min(94vw,90rem);max-width:96vw;max-height:94dv
 .document-zoom span{font-size:.8em;min-width:3em;text-align:center}
 .document-zoom button{min-width:44px;padding:.5em}
 .document-paper-scroll{overflow:auto;max-height:65dvh;scrollbar-width:thin;padding:12px;background:#343127;border-radius:6px}
-.document-paper-scroll iframe{display:block;max-width:none;min-height:360px;border:0;background:#fff;margin:0 auto;flex-shrink:0}
+.document-paper-scroll .receipt-paper{display:block;max-width:none;min-height:360px;border:0;background:#fff;color:#000;margin:0 auto;flex-shrink:0}
 .document-screen-note{display:block;font-size:.7em;line-height:1.5;color:var(--muted);margin-top:.8em}
 .document-queue{min-width:0}
 .document-queue>h3{font-size:1.1em;margin-bottom:.5em}
@@ -666,6 +656,37 @@ dialog.print-preview-dialog{width:min(94vw,90rem);max-width:96vw;max-height:94dv
 .document-attempts ol{padding-left:1.4em;margin:.5em 0 0}
 .document-attempts li{padding:.5em 0;overflow-wrap:anywhere}
 .document-attempts time,.document-attempts li span{display:block;line-height:1.5}
+/* Keep the preview workspace within the screen; fit the thermal document to its pane. */
+dialog.print-preview-dialog[open]{display:flex;flex-direction:column;width:96vw;max-width:1800px;height:96dvh;max-height:96dvh;overflow:hidden;padding:14px;font-size:14px;gap:10px}
+.print-preview-dialog .modal-heading{flex-shrink:0;margin:0;min-height:44px}
+.print-preview-dialog .modal-heading h2{font-size:20px}
+.print-preview-content{display:grid;grid-template-columns:minmax(280px,1fr) auto;grid-template-rows:auto auto minmax(0,1fr);gap:8px 16px;flex:1;min-height:0}
+.document-tabs{align-self:center;padding:3px;max-width:500px}
+.print-order-summary{padding:0;justify-content:flex-end;gap:12px;align-self:center}
+.print-preview-dialog .print-mode-note{grid-column:1/-1;margin:0;padding:5px 10px;font-size:12px}
+.print-preview-dialog .print-cancelled-note,.print-preview-content>.error{grid-column:1/-1;margin:0;padding:6px}
+.document-workspace{grid-column:1/-1;min-height:0;grid-template-columns:minmax(0,1fr) minmax(300px,360px);gap:12px;align-items:stretch}
+.document-pane{display:flex;flex-direction:column;min-height:0;padding:10px}
+.document-preview-toolbar{flex-shrink:0;margin-bottom:8px;gap:8px}
+.document-paper-scroll{flex:1;min-height:0;max-height:none!important;overflow:auto;padding:12px}
+.document-paper-scroll .receipt-paper{min-height:0;display:flow-root}
+.receipt-paper-frame{position:relative;margin:0 auto;flex-shrink:0}
+.document-paper-scroll .receipt-paper-frame .receipt-paper{position:absolute;top:0;left:0;margin:0;transform-origin:top left}
+.document-screen-note{flex-shrink:0;margin-top:5px;font-size:10px}
+.document-queue{min-height:0;overflow:auto;scrollbar-width:thin;padding-right:3px}
+.document-queue>h3{margin-bottom:4px}
+.print-preview-dialog .document-queue>p{margin-bottom:8px}
+.document-job{padding:12px;margin-bottom:10px}
+.document-job-heading{margin-bottom:8px}
+.print-preview-dialog .document-printer,.print-preview-dialog .document-job-warning,.print-preview-dialog .document-job-reason{margin:7px 0}
+.document-attempts{margin-top:6px}
+.document-attempts summary{min-height:30px}
+@media(max-height:700px){
+ .print-preview-dialog .document-queue>p{display:none}
+ .print-preview-dialog .document-job{padding:8px;margin-bottom:6px}
+ .print-preview-dialog .document-job-heading{margin-bottom:4px}
+ .print-preview-dialog .document-printer,.print-preview-dialog .document-job-warning{margin:4px 0}
+}
 @media(min-width:2000px){dialog.print-preview-dialog{width:90vw}}
 @media(max-width:800px){
  .document-workspace{grid-template-columns:minmax(0,1fr)}
