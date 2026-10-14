@@ -8,7 +8,12 @@ export function checkout(s:State,session:Session,raw:Checkout,demo:boolean):Orde
  const lines=input.lines.map(l=>{const item=s.items.find(p=>p.id===l.id);if(!item?.available)throw Error('An item is no longer available');const options=item.options||[],choices=l.choices||{};if(Object.keys(choices).length!==options.length||options.some(o=>!o.values.includes(choices[o.name])))throw Error(`Choose all options for ${item.name}`);const selection=options.map(o=>`${o.name}: ${choices[o.name]}`).join('; ');return {...structuredClone(item),qty:l.qty,notes:[selection,l.notes].filter(Boolean).join(' · ')};});
  const totals=calculate(lines,input.discount,s.settings.taxRate,s.settings.rounding);if(input.payment==='Cash'&&input.tendered<totals.total)throw Error('Cash received must cover the total');
  const order:Order={id:crypto.randomUUID(),reference:`CW-${++s.sequence}`,key:input.key,created:new Date().toISOString(),state:'paid',type:input.type,token:input.token,payment:input.payment,tendered:input.payment==='Cash'?input.tendered:totals.total,change:input.payment==='Cash'?input.tendered-totals.total:0,lines,totals,settings:structuredClone(s.settings)};
- s.orders.unshift(order);for(const kind of ['counter','kitchen'] as const){let state:Job['state']=demo?'preview':'queued';if(demo&&input.simulation==='unknown')state='unknown';else if(demo&&(input.simulation==='both-fail'||(input.simulation==='kitchen-failure'&&kind==='kitchen')))state='failed';s.jobs.push({id:crypto.randomUUID(),orderId:order.id,kind,state,printer:s.settings[kind],copy:false,reason:'',attempts:[]});}
+ s.orders.unshift(order);
+ // Two separate printers: 1 bill + 1 KOT. Shared/single printer: 2 bills + 1 KOT on that device.
+ const billCopies=s.settings.sharedPrinter?2:1;
+ const enqueue=(kind:'counter'|'kitchen')=>{let state:Job['state']=demo?'preview':'queued';if(demo&&input.simulation==='unknown')state='unknown';else if(demo&&(input.simulation==='both-fail'||(input.simulation==='kitchen-failure'&&kind==='kitchen')))state='failed';s.jobs.push({id:crypto.randomUUID(),orderId:order.id,kind,state,printer:s.settings[kind],copy:false,reason:'',attempts:[]});};
+ for(let i=0;i<billCopies;i++)enqueue('counter');
+ enqueue('kitchen');
  audit(s,session,'checkout',order.id);return order;
 }
 export function saveItem(s:State,session:Session,input:Item){requireAdmin(session);const item=itemSchema.parse(input);if(!s.categories.includes(item.category))throw Error('Choose a valid category');const i=s.items.findIndex(p=>p.id===item.id);if(i<0)s.items.push(item);else s.items[i]=item;audit(s,session,'menu',item.id);}

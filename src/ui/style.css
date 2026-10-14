@@ -136,6 +136,26 @@
   .topbar,.workspace{margin-left:0}
 }
 
+/* Keep brand topbar fixed while Menu/Orders/Reports/Settings scroll. Billing already uses its own locked shell. */
+@media(min-width:801px){
+  .shell:not(.billing-shell){position:fixed;inset:0;height:100dvh;display:flex;flex-direction:column;overflow:hidden}
+  .shell:not(.billing-shell) .topbar{flex-shrink:0;z-index:45}
+  .shell:not(.billing-shell) .workspace{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;display:flex;flex-direction:column}
+  /* Menu page: pin search + category nav; only the product table scrolls. */
+  .shell:not(.billing-shell) .workspace:has(.menu-management){overflow:hidden}
+  .shell:not(.billing-shell) .menu-management{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden;padding-bottom:0}
+  .shell:not(.billing-shell) .menu-management .page-title,
+  .shell:not(.billing-shell) .menu-management-toolbar,
+  .shell:not(.billing-shell) .menu-management .management-categories,
+  .shell:not(.billing-shell) .menu-management .management-filter-row,
+  .shell:not(.billing-shell) .menu-management .management-help{flex-shrink:0}
+  .shell:not(.billing-shell) .menu-management .management-table{flex:1;min-height:0;max-height:none;overflow:auto}
+  .shell:not(.billing-shell) .workspace:has(.menu-management) .workspace-footer{flex-shrink:0}
+}
+@media(max-width:800px){
+  .shell:not(.billing-shell) .topbar{position:sticky;top:0;z-index:45}
+}
+
 /* Put session controls in the sidebar and give billing the reclaimed banner space. */
 .sidebar .modebar{margin-top:auto;min-width:0;min-height:0;padding:16px 0 0;flex-direction:column;align-items:stretch;gap:8px}
 .sidebar .modebar>span{justify-content:center}
@@ -165,6 +185,10 @@
 .billing-products{overflow:visible;flex:none;align-content:start;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
 .billing-products .menu-product{display:flex;align-items:stretch;justify-content:flex-start;text-align:left;white-space:normal;padding:12px;gap:9px;min-height:154px;border-radius:12px;box-shadow:none}
 .billing-products .menu-product:hover{border-color:var(--yellow);background:#242014}
+/* Sold-out stays visible on billing, greyed out and not selectable. */
+.billing-products .menu-product.is-sold-out,.billing-products .menu-product.is-sold-out:hover{opacity:.55;filter:grayscale(.4);border-color:#3a4038;background:#151914;cursor:not-allowed}
+.billing-products .menu-product.is-sold-out .menu-product-category{color:#b9a27a}
+.billing-products .menu-product.is-sold-out .add,.shell .billing-products .menu-product.is-sold-out .add{background:#3a4038!important;border-color:#3a4038!important;color:#c4c8c0!important}
 .menu-product-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .billing-products .food-photo{width:42px;height:42px;aspect-ratio:1;border-radius:9px;display:grid;place-items:center;flex-shrink:0;border:0}
 .menu-product-category{color:var(--muted);font-size:10px;text-align:right}

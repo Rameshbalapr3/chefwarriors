@@ -22,6 +22,7 @@
 .shell .billing-print-status{background:#102330;border-color:#29404f}
 .shell .product,.shell .menu-product{background:#0d202d;border-color:#29404f}
 .shell .menu-product:hover{background:#152d3b;border-color:#d5b257}
+.shell .menu-product.is-sold-out,.shell .menu-product.is-sold-out:hover{background:#122028;border-color:#2a3842}
 .shell .grand-total,.shell .product-bottom strong{color:#ffdb79}
 .shell .categories button{background:#112532;border-color:#233a49}
 .shell .danger{color:#ff6986}
