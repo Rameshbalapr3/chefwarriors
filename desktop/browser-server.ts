@@ -8,18 +8,19 @@ import type {Result} from '../src/contracts/services';
 export type ClientContext={session:Session|null;transport:'desktop'|'browser'};
 export const BROWSER_PORT=17373;
 export const BROWSER_URL=`http://127.0.0.1:${BROWSER_PORT}`;
-const COOKIE='cw_pos_session',TTL=8*60*60*1000,MAX_BODY=128*1024;
+const COOKIE='cw_pos_session',TTL=8*60*60*1000,MAX_BODY=1024*1024; // allow product photo uploads (data URLs)
 const METHODS=new Set(['authStatus','login','logout','state','checkout','cancel','saveItem','saveCategory','saveSettings','printers','print','testPrinter','addUser']);
 type BrowserSession={context:ClientContext;expires:number};
 
 // Loopback only: this is the same-machine browser interface, not a LAN service.
-export async function startBrowserServer(options:{root:string;development:boolean;port?:number;invoke:(method:string,args:unknown[],client:ClientContext)=>Promise<Result<unknown>>}){
+export async function startBrowserServer(options:{root:string;photoRoot?:string;development:boolean;port?:number;invoke:(method:string,args:unknown[],client:ClientContext)=>Promise<Result<unknown>>}){
  const port=options.port??BROWSER_PORT,localUrl=`http://127.0.0.1:${port}`;
  const sessions=new Map<string,BrowserSession>();
  const origins=new Set([localUrl,`http://localhost:${port}`]);
  const hosts=new Set([`127.0.0.1:${port}`,`localhost:${port}`]);
  if(options.development){for(const host of ['127.0.0.1:5173','localhost:5173']){hosts.add(host);origins.add(`http://${host}`);}}
  const root=resolve(options.root);
+ const photoRoot=options.photoRoot?resolve(options.photoRoot):'';
  function json(res:ServerResponse,status:number,value:unknown){res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'});res.end(JSON.stringify(value));}
  function fail(res:ServerResponse,status:number,message:string){json(res,status,{ok:false,kind:status===403?'unauthorized':'operational',error:message});}
  function cookie(res:ServerResponse,id:string,maxAge=TTL/1000){res.setHeader('Set-Cookie',`${COOKIE}=${id}; HttpOnly; SameSite=Strict; Path=/api/pos; Max-Age=${maxAge}`);}
@@ -59,11 +60,20 @@ export async function startBrowserServer(options:{root:string;development:boolea
    }
    if(req.method!=='GET'&&req.method!=='HEAD'){fail(res,405,'Method not allowed');return;}
    const pathname=decodeURIComponent(url.pathname);
+   if(pathname.startsWith('/product-photos/')){
+    if(!photoRoot){fail(res,404,'Product photos unavailable');return;}
+    const name=pathname.slice('/product-photos/'.length);
+    if(!/^[a-zA-Z0-9_.-]+\.jpg$/.test(name)){fail(res,403,'Invalid photo path');return;}
+    const photoFile=resolve(photoRoot,name);
+    if(!photoFile.startsWith(photoRoot+sep)){fail(res,403,'Invalid photo path');return;}
+    try{const data=await readFile(photoFile);res.writeHead(200,{'Content-Type':'image/jpeg','Cache-Control':'no-cache','Access-Control-Allow-Origin':req.headers.origin&&origins.has(req.headers.origin)?req.headers.origin:'http://127.0.0.1:5173'});res.end(req.method==='HEAD'?undefined:data);}catch{fail(res,404,'Photo not found');}
+    return;
+   }
    const file=resolve(root,pathname==='/'?'index.html':`.${pathname}`);
    if(!file.startsWith(root+sep)){fail(res,403,'Invalid file path');return;}
    const mime:Record<string,string>={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.svg':'image/svg+xml','.webp':'image/webp','.ico':'image/x-icon','.woff2':'font/woff2'};
    if(!mime[extname(file)]){fail(res,404,'Not found');return;}
-   try{const data=await readFile(file);res.writeHead(200,{'Content-Type':mime[extname(file)],'Cache-Control':'no-cache','Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-src 'self' about:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"});res.end(req.method==='HEAD'?undefined:data);}catch{fail(res,404,'Application files not found. Install the updated POS release.');}
+   try{const data=await readFile(file);res.writeHead(200,{'Content-Type':mime[extname(file)],'Cache-Control':'no-cache','Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: http://127.0.0.1:* http://localhost:*; connect-src 'self'; frame-src 'self' about:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"});res.end(req.method==='HEAD'?undefined:data);}catch{fail(res,404,'Application files not found. Install the updated POS release.');}
   }catch{if(!res.headersSent)fail(res,400,'Unable to process this POS request');else res.end();}
  });
  server.requestTimeout=15000;server.headersTimeout=10000;

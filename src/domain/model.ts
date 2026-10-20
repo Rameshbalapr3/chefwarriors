@@ -1,5 +1,5 @@
 import { z } from 'zod';
-export const itemSchema=z.object({id:z.string().min(1),name:z.string().trim().min(1).max(100),category:z.string().trim().min(1).max(40),price:z.number().int().min(0).max(10000000),available:z.boolean(),image:z.number().int().min(0).max(15),description:z.string().max(800).optional(),options:z.array(z.object({name:z.string().min(1).max(60),values:z.array(z.string().min(1).max(60)).min(1).max(10)})).max(8).optional()});
+export const itemSchema=z.object({id:z.string().min(1),name:z.string().trim().min(1).max(100),category:z.string().trim().min(1).max(40),price:z.number().int().min(0).max(10000000),available:z.boolean(),image:z.number().int().min(0).max(15),photo:z.string().regex(/^product-photos\/[a-zA-Z0-9_.-]+\.jpg$/).max(120).optional(),description:z.string().max(800).optional(),options:z.array(z.object({name:z.string().min(1).max(60),values:z.array(z.string().min(1).max(60)).min(1).max(10)})).max(8).optional()});
 export type Item=z.infer<typeof itemSchema>;
 export const settingsSchema=z.object({shop:z.string().trim().min(1).max(80),address:z.string().max(200),phone:z.string().max(30),taxRate:z.number().min(0).max(100),rounding:z.enum(['paise','rupee']),width:z.enum(['58','80']),counter:z.string().max(200),kitchen:z.string().max(200),sharedPrinter:z.boolean()});
 export type Settings=z.infer<typeof settingsSchema>;

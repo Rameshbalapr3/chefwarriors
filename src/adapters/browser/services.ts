@@ -6,6 +6,7 @@ export function browserServices():Services{
   while(args.length&&args[args.length-1]===undefined)args.pop();
   try{
    const response=await fetch(`/api/pos/${method}`,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-POS-Request':'1'},body:JSON.stringify(args),signal:AbortSignal.timeout(65000)});
+   if(response.status===413)return {ok:false,kind:'operational',error:'Photo is too large to save. Use a smaller image and try again.'};
    const result=await response.json();
    if(!result||typeof result.ok!=='boolean')throw Error('Invalid POS response');
    return result as Result<T>;

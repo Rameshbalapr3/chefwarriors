@@ -464,7 +464,13 @@
   .management-table td,.management-table th{padding:.75em}
   .management-table td:first-child{min-width:13em}
 }
-.editor-image-preview{width:80px;height:80px;aspect-ratio:1;border-radius:10px;margin-bottom:12px}
+.editor-image-preview{width:80px;height:80px;aspect-ratio:1;border-radius:10px;margin-bottom:4px}
+.custom-food-photo{padding:0;overflow:hidden;background:#101f2b!important;background-image:none!important}
+.custom-food-photo>img{display:block;width:100%;height:100%;object-fit:cover}
+.editor-image-block{display:flex;flex-direction:column;gap:10px;margin:0 0 16px;padding:12px;border:1px solid #403c2e;border-radius:10px;background:#16140f}
+.editor-upload-row{display:flex;flex-wrap:wrap;gap:8px;align-items:end}
+.editor-upload-label{flex:1 1 14em;margin:0}
+.editor-upload-label input[type=file]{padding:8px;min-height:44px;background:#1b1b16;border:1px solid #f2c354;border-radius:8px;color:#eaf0f4}
 
 /* Order history: filters, totals and print recovery remain easy to scan. */
 .order-history{font-size:clamp(14px,.9vw,28px);min-width:0;padding-bottom:1em}
