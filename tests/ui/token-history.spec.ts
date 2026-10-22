@@ -23,6 +23,18 @@ test('owner sales reports show daily tokens and monthly totals separately',async
  await page.getByRole('button',{name:'All dates',exact:true}).click();
  await expect(tokenPanel.locator('tbody tr')).toHaveCount(2);
 });
+test('cashier navigation shows only billing and orders',async({page})=>{
+ await page.setViewportSize({width:1366,height:768});
+ await page.addInitScript(state=>{window.pos={mode:'browser',authStatus:async()=>({ok:true,data:{setup:false,session:{username:'Till',role:'cashier'}}}),state:async()=>({ok:true,data:state})} as typeof window.pos;},initialState());
+ await page.goto('/');
+ await expect(page.getByRole('button',{name:'Billing'})).toBeVisible();
+ await expect(page.getByRole('button',{name:'Orders'})).toBeVisible();
+ await expect(page.getByRole('button',{name:'Menu / Products'})).toHaveCount(0);
+ await expect(page.getByRole('button',{name:'Sales Reports'})).toHaveCount(0);
+ await expect(page.getByRole('button',{name:'Settings'})).toHaveCount(0);
+ await expect(page.getByRole('button',{name:'Open settings'})).toHaveCount(0);
+ await expect(page.getByRole('heading',{name:'Add items to bill'})).toBeVisible();
+});
 test('takeaway token shows the next daily number and cannot be typed',async({page})=>{
  const state=initialState();
  checkout(state,{role:'admin',username:'test'},{key:'shown-token-1',lines:[{id:state.items[0].id,qty:1,notes:''}],discount:0,type:'Takeaway',token:'01',payment:'Cash',tendered:6000},false);
