@@ -19,7 +19,69 @@ export function calculate(lines:{price:number;qty:number}[],discount:number,taxR
  const tax=Math.round((subtotal-discount)*taxRate/100),raw=subtotal-discount+tax,total=rounding==='rupee'?Math.round(raw/100)*100:raw;
  return {subtotal,discount,tax,rounding:total-raw,total};
 }
-export function kitchenTicket(order:Order){return {reference:order.reference,created:order.created,type:order.type,token:order.token,items:order.lines.map(l=>({name:l.name,qty:l.qty,contents:l.description||'',notes:l.notes}))};}
+type ChoiceGroup={name:string;values:string[]};
+type ServedLine={description?:string;notes?:string;options?:ChoiceGroup[]};
+function wordsOf(value:string){return value.toLowerCase().replace(/[^a-z0-9]+/g,' ').trim().split(/\s+/).filter(Boolean);}
+function namesMatch(a:string,b:string){
+ const left=wordsOf(a),right=wordsOf(b);if(!left.length||!right.length)return false;
+ if(left.join(' ')===right.join(' '))return true;
+ const l=new Set(left),r=new Set(right);
+ return left.every(w=>r.has(w))||right.every(w=>l.has(w));
+}
+function escapeReg(value:string){return value.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');}
+export function parseLineChoices(notes:string,options?:ChoiceGroup[]){
+ if(!notes)return {choices:{} as Record<string,string>,note:''};
+ if(!options?.length)return {choices:{} as Record<string,string>,note:notes};
+ const choices:Record<string,string>={};
+ let rest=notes;
+ for(const option of options){
+  const match=rest.match(new RegExp(`${escapeReg(option.name)}:\\s*([^;·]+)`));
+  if(!match)continue;
+  const pick=match[1].trim();
+  if(option.values.includes(pick)){choices[option.name]=pick;rest=rest.replace(match[0],'').replace(/^[;·\s]+/, '');}
+ }
+ return {choices,note:rest.replace(/^[;·\s]+|[;·\s]+$/g,'').trim()};
+}
+function formatChosenPart(body:string,pick:string){
+ const sides=body.split(/\s*\(or\)\s*/i).map(side=>side.trim());
+ if(sides.length!==2)return pick;
+ const [left,right]=sides;
+ const leftHit=namesMatch(pick,left),rightHit=namesMatch(pick,right);
+ if(leftHit&&!rightHit)return left;
+ if(rightHit&&/rice/i.test(left)&&/noodles/i.test(`${pick} ${right}`))return left.replace(/rice/ig,right.match(/noodles/i)?right:pick);
+ if(rightHit){
+  const size=left.match(/^(Full|Half|Quarter)\b/i);
+  if(size&&/grill/i.test(left)&&/bbq/i.test(`${pick} ${right}`))return `${size[1]} ${right}`;
+  return pick.length>=right.length?pick:right;
+ }
+ return pick;
+}
+function optionFitsPart(body:string,option:ChoiceGroup){
+ const sides=body.split(/\s*\(or\)\s*/i).map(side=>side.trim());
+ if(sides.length!==2)return false;
+ return option.values.some(value=>sides.some(side=>namesMatch(value,side)));
+}
+export function servedContents(line:ServedLine){
+ const description=(line.description||'').trim(),{choices,note}=parseLineChoices(line.notes||'',line.options);
+ const options=line.options||[];
+ if(!description)return {contents:Object.values(choices),note};
+ if(!/\(or\)/i.test(description)||!options.length||!Object.keys(choices).length)return {contents:[description],note:Object.keys(choices).length?note:line.notes||''};
+ const unused=options.map(option=>({...option,pick:choices[option.name],used:false}));
+ const contents:string[]=[];
+ for(const part of description.split(/\s*\+\s*/).map(piece=>piece.trim()).filter(Boolean)){
+  const qty=part.match(/\s*\((\d+)\)\s*$/),body=(qty?part.slice(0,qty.index):part).trim();
+  if(!/\(or\)/i.test(body)){contents.push(part);continue;}
+  const matching=unused.filter(option=>!option.used&&option.pick&&optionFitsPart(body,option));
+  if(!matching.length){contents.push(part);continue;}
+  matching.forEach(option=>{option.used=true;});
+  if(matching.length===1){contents.push(`${formatChosenPart(body,matching[0].pick!)}${qty?` (${qty[1]})`:''}`);continue;}
+  const counts=new Map<string,number>();
+  for(const option of matching){const label=formatChosenPart(body,option.pick!);counts.set(label,(counts.get(label)||0)+1);}
+  for(const [label,count] of counts)contents.push(`${label} (${count})`);
+ }
+ return {contents,note};
+}
+export function kitchenTicket(order:Order){return {reference:order.reference,created:order.created,type:order.type,token:order.token,items:order.lines.map(l=>{const served=servedContents(l);return {name:l.name,qty:l.qty,contents:served.contents.join(', '),notes:served.note};})};}
 export function report(orders:Order[]){const paid=orders.filter(o=>o.state==='paid');return {sales:paid.reduce((s,o)=>s+o.totals.total,0),count:paid.length,cancelled:orders.filter(o=>o.state==='cancelled').reduce((s,o)=>s+o.totals.total,0),payments:['Cash','UPI','Card'].map(method=>({method,total:paid.filter(o=>o.payment===method).reduce((s,o)=>s+o.totals.total,0)})),items:paid.flatMap(o=>o.lines).reduce<Record<string,number>>((r,l)=>{r[l.name]=(r[l.name]||0)+l.qty;return r;},{})};}
 export function csvCell(value:unknown){let s=String(value);if(/^[\s]*[=+@\-\t\r]/.test(s))s="'"+s;return '"'+s.replaceAll('"','""')+'"';}
 export function localDate(value:string){const d=new Date(value);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}

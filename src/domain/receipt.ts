@@ -1,4 +1,4 @@
-import {money,kitchenTicket,type Order} from './model';
+import {money,kitchenTicket,servedContents,type Order} from './model';
 export const escapeHtml=(s:unknown)=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!));
 function billWhen(iso:string){
  const d=new Date(iso);
@@ -25,7 +25,7 @@ export function receiptHtml(order:Order,kind:'counter'|'kitchen',copy=false){
  const shop=e(order.settings.shop.toUpperCase());
  const width=Number(order.settings.width)-8;
  const when=billWhen(order.created);
- const items=order.lines.map(l=>`<tr><td class="item">${wrapItemName(l.name)}${l.description?`<br><small>${e(l.description)}</small>`:''}${l.notes?`<br><small>${e(l.notes)}</small>`:''}</td><td class="qty">${l.qty}</td><td class="num">${money(l.price)}</td><td class="num">${money(l.price*l.qty)}</td></tr>`).join('');
+ const items=order.lines.map(l=>{const served=servedContents(l),extra=[...served.contents,served.note].filter(Boolean).map(text=>`<br><small>${e(text)}</small>`).join('');return `<tr><td class="item">${wrapItemName(l.name)}${extra}</td><td class="qty">${l.qty}</td><td class="num">${money(l.price)}</td><td class="num">${money(l.price*l.qty)}</td></tr>`;}).join('');
  const extra=([
   order.totals.discount?['Discount',-order.totals.discount] as const:null,
   order.totals.tax?[`Tax (${order.settings.taxRate}%)`,order.totals.tax] as const:null,

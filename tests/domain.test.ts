@@ -1,5 +1,5 @@
 import {describe,it,expect} from 'vitest';
-import {calculate,kitchenTicket,csvCell,report,localDate,localMonth,nextDailyToken,dailyTokenTaken,tokenHistoryByDay,monthlyOrderTotals} from '../src/domain/model';
+import {calculate,kitchenTicket,csvCell,report,localDate,localMonth,nextDailyToken,dailyTokenTaken,tokenHistoryByDay,monthlyOrderTotals,servedContents} from '../src/domain/model';
 import {initialState} from '../src/domain/seed';
 import {checkout,cancel,saveItem,saveSettings,preparePrint} from '../src/application/engine';
 import {receiptHtml} from '../src/domain/receipt';
@@ -19,6 +19,21 @@ describe('billing rules',()=>{
  it('enforces service permissions and required reasons',()=>{const s=initialState(),o=checkout(s,cashier,input(),true);expect(()=>cancel(s,cashier,o.id,'Reason')).toThrow();expect(()=>cancel(s,admin,o.id,'')).toThrow();expect(()=>saveItem(s,cashier,s.items[0])).toThrow();expect(()=>saveSettings(s,cashier,s.settings)).toThrow();});
  it('retries only failed job; unknown needs reviewed copy',()=>{const s=initialState();checkout(s,admin,{...input(),simulation:'kitchen-failure'},true);expect(s.jobs[0].state).toBe('preview');const j=preparePrint(s,cashier,s.jobs[1].id);expect(j.id).toBe(s.jobs[1].id);expect(s.jobs).toHaveLength(2);s.jobs[1].state='unknown';expect(()=>preparePrint(s,admin,j.id)).toThrow();const copy=preparePrint(s,admin,j.id,'Checked printer; no ticket');expect(copy.copy).toBe(true);expect(s.orders).toHaveLength(1);expect(s.jobs).toHaveLength(3);});
  it('escapes spreadsheet formulas',()=>{expect(csvCell('=CMD()')).toBe('"\'=CMD()"');expect(csvCell(' hello')).toBe('" hello"');expect(csvCell('a"b')).toBe('"a""b"');});
+ it('prints chosen combo items and omits unused alternatives',()=>{
+  const s=initialState(),item=s.items.find(i=>i.name==='Birthday Combo — Medium Load')!;
+  const o=checkout(s,admin,{...input(),lines:[{id:item.id,qty:1,notes:'',choices:{'Grill or BBQ':'Grill','Rice or noodles':'Noodles'}}],tendered:54000},true);
+  const html=receiptHtml(o,'counter'),served=servedContents(o.lines[0]);
+  expect(o.reference).toBe('CW-1001');expect(o.totals.total).toBe(54000);
+  expect(served.contents).toEqual(['Half Grill (1)','Fried Chicken Shawarma (1)','Fried Chicken Burger (1)','Fried Chicken Sandwich (1)','Noodles (1)']);
+  expect(html).toContain('Half Grill (1)');expect(html).toContain('Fried Chicken Shawarma (1)');expect(html).toContain('Noodles (1)');
+  expect(html).not.toContain('(or)');expect(html).not.toContain('Grill or BBQ:');expect(html).not.toContain('BBQ (1)');
+  const kot=kitchenTicket(o);expect(kot.items[0].contents).toContain('Half Grill (1)');expect(kot.items[0].contents).not.toContain('(or)');
+ });
+ it('splits two rice/noodles picks on a top-load combo',()=>{
+  const s=initialState(),item=s.items.find(i=>i.name==='Birthday Combo — Top Load')!;
+  const o=checkout(s,admin,{...input(),lines:[{id:item.id,qty:1,notes:'',choices:{'Grill or BBQ':'BBQ','First rice/noodles':'Rice','Second rice/noodles':'Noodles'}}],tendered:100000},true);
+  expect(servedContents(o.lines[0]).contents).toEqual(['Full BBQ (1)','Fried Chicken Shawarma (2)','Fried Chicken Burger (2)','Fried Chicken Sandwich (2)','Rice (1)','Noodles (1)']);
+ });
  it('assigns a daily token from 1 without changing invoice numbers or typed token',()=>{
   const s=initialState(),first=checkout(s,admin,input(),true),second=checkout(s,admin,{...input(),key:crypto.randomUUID()},true);
   expect(first.reference).toBe('CW-1001');expect(second.reference).toBe('CW-1002');

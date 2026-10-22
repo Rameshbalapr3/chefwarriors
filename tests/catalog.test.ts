@@ -21,5 +21,9 @@ it('requires genuine combo options and snapshots distinct rice/noodle variants w
  expect(()=>checkout(s,actor,input,false)).toThrow('Choose all options');
  expect(()=>checkout(s,actor,{...input,lines:[{...input.lines[0],choices:{'Mini rice or noodles':'Not on menu'}}]},false)).toThrow();
  const order=checkout(s,actor,{...input,lines:[{...input.lines[0],choices:{'Mini rice or noodles':'Mini Rice'}},{...input.lines[0],choices:{'Mini rice or noodles':'Mini Noodles'}}]},false);
- expect(order.totals.total).toBe(24000);const ticket=kitchenTicket(order);expect(ticket.items[0].notes).toContain('Mini Rice');expect(ticket.items[1].notes).toContain('Mini Noodles');expect(ticket.items[0].contents).toContain('Mini Shawarma');expect(JSON.stringify(ticket)).not.toContain('price');
+ expect(order.totals.total).toBe(24000);const ticket=kitchenTicket(order);
+ expect(ticket.items[0].notes).toBe('No chilli');expect(ticket.items[1].notes).toBe('No chilli');
+ expect(ticket.items[0].contents).toContain('Mini Shawarma');expect(ticket.items[0].contents).toContain('Mini Fried Chicken Rice');
+ expect(ticket.items[1].contents).toContain('Mini Fried Chicken Noodles');expect(ticket.items[0].contents).not.toContain('(or)');
+ expect(JSON.stringify(ticket)).not.toContain('price');
 });
