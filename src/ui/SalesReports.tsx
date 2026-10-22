@@ -1,9 +1,11 @@
 import {useState} from 'react';
 import {Download,ChartNoAxesCombined} from 'lucide-react';
-import {csvCell,localDate,money,type Order} from '../domain/model';
+import {csvCell,localDate,localMonth,money,monthlyOrderTotals,tokenHistoryByDay,type Order} from '../domain/model';
 
 const today=()=>localDate(new Date().toISOString());
 const dateLabel=(value:string)=>new Date(`${value}T12:00:00`).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
+const monthLabel=(value:string)=>new Date(`${value}-01T12:00:00`).toLocaleDateString('en-IN',{month:'long',year:'numeric'});
+const tokenRange=(first?:number,last?:number)=>first&&last?first===last?String(first):`${first}–${last}`:'—';
 type ItemSales={id:string;name:string;qty:number;gross:number};
 
 export function SalesReports({orders}:{orders:Order[]}){
@@ -20,11 +22,15 @@ export function SalesReports({orders}:{orders:Order[]}){
  for(const o of paid)for(const line of o.lines){const key=JSON.stringify([line.id,line.name]),row=itemMap.get(key)||{id:key,name:line.name,qty:0,gross:0};row.qty+=line.qty;row.gross+=line.qty*line.price;itemMap.set(key,row);}
  const items=[...itemMap.values()].sort((a,b)=>itemSort==='gross'?b.gross-a.gross||a.name.localeCompare(b.name):b.qty-a.qty||a.name.localeCompare(b.name));
  const days=[...dayMap.values()].sort((a,b)=>b.day.localeCompare(a.day));
+ const tokenDays=tokenHistoryByDay(selected);
+ const months=monthlyOrderTotals(orders);
+ const thisMonth=localMonth(new Date().toISOString());
+ const thisMonthTotal=months.find(row=>row.month===thisMonth)?.count||0;
  const breakdown:[string,number][]=[['Item subtotal',totals.subtotal],['Discounts',-totals.discount],['Sales after discounts, before tax',totals.subtotal-totals.discount],['Tax',totals.tax],['Rounding',totals.rounding],['Paid total',totals.total]];
  function choosePeriod(value:string){setPeriod(value);if(value==='all'){setFrom('');setTo('');return;}const end=new Date(),start=new Date();if(value==='yesterday'){start.setDate(start.getDate()-1);end.setDate(end.getDate()-1);}if(value==='week')start.setDate(start.getDate()-6);if(value==='month')start.setDate(1);setFrom(localDate(start.toISOString()));setTo(localDate(end.toISOString()));}
  function exportCsv(){
   let rows:unknown[][];
-  if(exportKind==='orders')rows=[['Invoice','Date and time','Status','Payment','Order type','Subtotal INR','Discount INR','Tax INR','Rounding INR','Total INR','Cancellation reason'],...selected.map(o=>[o.reference,new Date(o.created).toLocaleString('en-IN'),o.state,o.payment,o.type,...[o.totals.subtotal,o.totals.discount,o.totals.tax,o.totals.rounding,o.totals.total].map(v=>(v/100).toFixed(2)),o.reason||''])];
+  if(exportKind==='orders')rows=[['Invoice','Date and time','Status','Payment','Order type','Daily token','Subtotal INR','Discount INR','Tax INR','Rounding INR','Total INR','Cancellation reason'],...selected.map(o=>[o.reference,new Date(o.created).toLocaleString('en-IN'),o.state,o.payment,o.type,o.dailyToken??'',...[o.totals.subtotal,o.totals.discount,o.totals.tax,o.totals.rounding,o.totals.total].map(v=>(v/100).toFixed(2)),o.reason||''])];
   else if(exportKind==='items')rows=[['Product','Quantity','Item sales before discounts and tax INR'],...items.map(i=>[i.name,i.qty,(i.gross/100).toFixed(2)])];
   else rows=[['Report period',from||'All dates',to||'All dates'],['Metric','Value'],['Paid orders',paid.length],['Cancelled orders',cancelled.length],...breakdown.map(([label,value])=>[`${label} INR`,(value/100).toFixed(2)]),['Cancelled order value INR (excluded)',(cancelledTotal/100).toFixed(2)],[],['Payment','Paid orders','Total INR'],...payments.map(p=>[p.method,p.count,(p.total/100).toFixed(2)]),[],['Date','Paid orders','Paid total INR','Cancelled orders'],...days.map(d=>[d.day,d.count,(d.total/100).toFixed(2),d.cancelled])];
   const blob=new Blob(['\uFEFF'+rows.map(row=>row.map(csvCell).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`sales-${exportKind}-${from||'all'}-${to||'all'}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
@@ -39,5 +45,9 @@ export function SalesReports({orders}:{orders:Order[]}){
   <section className="panel sales-panel"><div className="sales-panel-heading"><h2>Items sold</h2><label>Sort<select value={itemSort} onChange={e=>setItemSort(e.target.value)}><option value="quantity">Quantity</option><option value="gross">Item sales</option></select></label></div><p>Item sales use saved prices, before bill discounts and tax.</p><div className="sales-table-scroll"><table><thead><tr><th scope="col">Product</th><th scope="col" className="sales-numeric">Qty</th><th scope="col" className="sales-numeric">Item sales</th></tr></thead><tbody>{items.map(i=><tr key={i.id}><td>{i.name}</td><td className="sales-numeric">{i.qty}</td><td className="sales-numeric">{money(i.gross)}</td></tr>)}</tbody></table>{!items.length&&<p className="sales-no-data">No paid items in this period.</p>}</div></section>
   <section className="panel sales-panel"><h2>Daily sales</h2><p>Days with orders, newest first. Cancelled values are excluded.</p><div className="sales-table-scroll"><table><thead><tr><th scope="col">Date</th><th scope="col" className="sales-numeric">Paid orders</th><th scope="col" className="sales-numeric">Paid total</th><th scope="col" className="sales-numeric">Cancelled</th></tr></thead><tbody>{days.map(d=><tr key={d.day}><td>{dateLabel(d.day)}</td><td className="sales-numeric">{d.count}</td><td className="sales-numeric">{money(d.total)}</td><td className="sales-numeric">{d.cancelled}</td></tr>)}</tbody></table>{!days.length&&<p className="sales-no-data">No daily activity in this period.</p>}</div></section></div>
   <section className="panel sales-panel sales-order-types"><h2>Order types</h2><div>{types.map(t=><div key={t.type}><span>{t.type}</span><small>{t.count} paid orders</small><strong>{money(t.total)}</strong></div>)}</div></section>
+  <div className="sales-panels sales-token-panels">
+   <section className="panel sales-panel"><h2>Daily token history</h2><p>Each day starts at token 1. Invoice numbers stay CW-… and do not reset.</p><div className="sales-table-scroll"><table><thead><tr><th scope="col">Date</th><th scope="col" className="sales-numeric">Tokens</th><th scope="col" className="sales-numeric">Orders</th><th scope="col" className="sales-numeric">Cancelled</th></tr></thead><tbody>{tokenDays.map(row=><tr key={row.day}><td>{dateLabel(row.day)}</td><td className="sales-numeric">{tokenRange(row.first,row.last)}</td><td className="sales-numeric">{row.count}</td><td className="sales-numeric">{row.cancelled}</td></tr>)}</tbody></table>{!tokenDays.length&&<p className="sales-no-data">No token history in this period.</p>}</div></section>
+   <section className="panel sales-panel"><h2>Monthly order totals</h2><p>This month: {thisMonthTotal} orders. Totals keep adding after the daily token resets.</p><div className="sales-table-scroll"><table><thead><tr><th scope="col">Month</th><th scope="col" className="sales-numeric">Orders</th></tr></thead><tbody>{months.map(row=><tr key={row.month} className={row.month===thisMonth?'sales-current-month':''}><td>{monthLabel(row.month)}{row.month===thisMonth?' · this month':''}</td><td className="sales-numeric">{row.count}</td></tr>)}</tbody></table>{!months.length&&<p className="sales-no-data">No saved orders yet.</p>}</div></section>
+  </div>
  </section>;
 }

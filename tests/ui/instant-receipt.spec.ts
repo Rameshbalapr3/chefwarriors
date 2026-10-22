@@ -34,20 +34,19 @@ test('saved receipt renders while both printer callbacks are still pending',asyn
   await expect(paper).toContainText('Fried Chicken Wings');
   const state=await page.evaluate(()=>window.pos!.state());
   expect(state.ok&&state.data.orders.length).toBe(1);
-  expect(state.ok&&state.data.jobs).toHaveLength(3);
-  expect(state.ok&&state.data.jobs.map(j=>j.kind)).toEqual(['counter','counter','kitchen']);
+  expect(state.ok&&state.data.jobs).toHaveLength(2);
+  expect(state.ok&&state.data.jobs.map(j=>j.kind)).toEqual(['counter','counter']);
   expect(state.ok&&state.data.jobs[0].state).toBe('submitting');
   await expect.poll(()=>app.evaluate(()=>(globalThis as any).pendingTestPrints.length)).toBe(1);
-  // Shared printer prints sequentially: bill, bill, KOT — complete each pending callback in order.
-  for(let i=0;i<3;i++){
+  // Two identical bills print sequentially on the same printer.
+  for(let i=0;i<2;i++){
    await expect.poll(()=>app.evaluate(()=>(globalThis as any).pendingTestPrints.length)).toBe(1);
    await app.evaluate(()=>{const cbs=(globalThis as any).pendingTestPrints as Array<(ok:boolean)=>void>;const cb=cbs.shift();if(cb)cb(true);});
   }
-  await page.getByRole('button',{name:'Kitchen ticket',exact:true}).click();
-  const kitchen=page.getByRole('document',{name:'Price-free kitchen ticket preview'});
-  await expect(kitchen).toContainText('KITCHEN ORDER');await expect(kitchen).not.toContainText('₹');
-  await page.getByRole('button',{name:'Zoom in receipt'}).click();await expect(kitchen).toContainText('CW-1001');
-  await expect(page.getByText('Submitted to printer',{exact:true})).toHaveCount(3,{timeout:5000});
+  await expect(page.getByRole('button',{name:'Kitchen ticket',exact:true})).toHaveCount(0);
+  await expect(paper).toContainText('₹');
+  await page.getByRole('button',{name:'Zoom in receipt'}).click();await expect(paper).toContainText('CW-1001');
+  await expect(page.getByText('Submitted to printer',{exact:true})).toHaveCount(2,{timeout:5000});
   await page.screenshot({path:'test-results/instant-receipt.png'});
  }finally{
   await app.evaluate(()=>{for(const cb of (globalThis as any).pendingTestPrints||[])cb(true);}).catch(()=>{});

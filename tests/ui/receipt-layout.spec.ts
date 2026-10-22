@@ -16,9 +16,9 @@ for(const size of [{width:1920,height:1080},{width:1366,height:768},{width:1280,
   const box=await button.boundingBox();expect(box!.y+box!.height).toBeLessThan(size.height);
  }
  await page.screenshot({path:`test-results/receipt-layout-${size.width}.png`});
- await page.getByRole('button',{name:'Kitchen ticket',exact:true}).click();
- const paper=page.getByRole('document',{name:'Price-free kitchen ticket preview'});
- await expect(paper).toContainText('KITCHEN ORDER');
+ const paper=page.getByRole('document',{name:'Customer receipt preview'});
+ await expect(paper).toContainText('CW-1001');
+ await expect(page.getByRole('button',{name:'Kitchen ticket',exact:true})).toHaveCount(0);
  async function stable(){
   const samples=await paper.evaluate(async el=>{
    const samples:number[]=[];

@@ -1,0 +1,38 @@
+import {test,expect} from '@playwright/test';
+import {initialState} from '../../src/domain/seed';
+import {checkout} from '../../src/application/engine';
+test('owner sales reports show daily tokens and monthly totals separately',async({page})=>{
+ const state=initialState();
+ const actor={role:'admin' as const,username:'test'};
+ const input={lines:[{id:state.items[0].id,qty:1,notes:''}],discount:0,type:'Takeaway' as const,token:'01',payment:'Cash' as const,tendered:6000};
+ const previous=checkout(state,actor,{...input,key:'token-history-previous'},false);
+ checkout(state,actor,{...input,key:'token-history-current'},false);
+ const lastMonth=new Date();lastMonth.setMonth(lastMonth.getMonth()-1);
+ previous.created=lastMonth.toISOString();
+ await page.setViewportSize({width:1366,height:768});
+ await page.addInitScript(state=>{window.pos={mode:'browser',authStatus:async()=>({ok:true,data:{setup:false,session:{username:'Test',role:'admin'}}}),state:async()=>({ok:true,data:state})} as typeof window.pos;},state);
+ await page.goto('/');
+ await page.getByRole('button',{name:'Sales Reports'}).click();
+ const tokenPanel=page.locator('.sales-token-panels section').nth(0);
+ const monthPanel=page.locator('.sales-token-panels section').nth(1);
+ await expect(page.getByRole('heading',{name:'Daily token history',exact:true})).toBeVisible();
+ await expect(page.getByRole('heading',{name:'Monthly order totals',exact:true})).toBeVisible();
+ await expect(tokenPanel.locator('tbody tr')).toHaveCount(1);
+ await expect(monthPanel.locator('tbody tr')).toHaveCount(2);
+ await expect(monthPanel).toContainText('this month');
+ await page.getByRole('button',{name:'All dates',exact:true}).click();
+ await expect(tokenPanel.locator('tbody tr')).toHaveCount(2);
+});
+test('takeaway token shows the next daily number and cannot be typed',async({page})=>{
+ const state=initialState();
+ checkout(state,{role:'admin',username:'test'},{key:'shown-token-1',lines:[{id:state.items[0].id,qty:1,notes:''}],discount:0,type:'Takeaway',token:'01',payment:'Cash',tendered:6000},false);
+ await page.setViewportSize({width:1366,height:768});
+ await page.addInitScript(state=>{window.pos={mode:'browser',authStatus:async()=>({ok:true,data:{setup:false,session:{username:'Test',role:'admin'}}}),state:async()=>({ok:true,data:state})} as typeof window.pos;},state);
+ await page.goto('/');
+ const token=page.getByLabel("Today's token");
+ await expect(token).toHaveValue('2');
+ await expect(token).toHaveAttribute('readonly','');
+ await page.getByRole('button',{name:'Dine-in',exact:true}).click();
+ await expect(page.getByLabel('Table or token')).toBeEditable();
+ await expect(page.getByLabel('Table or token')).toHaveValue('01');
+});

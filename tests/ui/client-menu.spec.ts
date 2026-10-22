@@ -12,8 +12,9 @@ test('branded client menu and separately configurable combo variants',async({pag
  await expect(page.locator('.cart-item')).toHaveCount(2);
  await page.screenshot({path:'test-results/client-combo.png'});
  await page.getByRole('button',{name:'Save & Print Bill',exact:true}).click();
- const receipt=page.frameLocator('iframe');await expect(receipt.getByText('The Chef Warriors',{exact:true})).toBeVisible();await expect(receipt.locator('body')).toContainText('8754090104');
- await page.getByRole('button',{name:'Kitchen ticket',exact:true}).click();
- await expect(receipt.locator('body')).toContainText('Mini Rice');await expect(receipt.locator('body')).toContainText('Mini Noodles');await expect(receipt.locator('body')).toContainText('Mini Shawarma');await expect(receipt.locator('body')).not.toContainText('₹');
+ const paper=page.getByRole('document',{name:'Customer receipt preview'});
+ await expect(paper).toContainText('The Chef Warriors');await expect(paper).toContainText('8754090104');
+ await expect(paper).toContainText('Mini Rice');await expect(paper).toContainText('Mini Noodles');await expect(paper).toContainText('Mini Shawarma');
+ await expect(page.getByRole('button',{name:'Kitchen ticket',exact:true})).toHaveCount(0);
  await page.getByRole('button',{name:'Close dialog'}).click();await page.getByLabel('Search menu items').fill('');await page.screenshot({path:'test-results/client-billing.png'});
 });
