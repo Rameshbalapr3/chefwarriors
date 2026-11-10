@@ -30,21 +30,24 @@ describe('optional supabase sync',()=>{
 
  function mockClient(overrides:Partial<SupabaseRestClient>={}){
   const calls:string[]=[];
-  let orders:any[]=[],jobs:any[]=[],users:any[]=[],meta:any[]=[];
+  let orders:any[]=[],jobs:any[]=[],users:any[]=[],expenses:any[]=[],meta:any[]=[];
   const client={
    calls,
    async upsertMeta(payload:unknown,revision:number){calls.push('meta');meta=[{id:'default',payload,updated_at:new Date().toISOString(),revision}];},
    async upsertOrders(rows:any[]){calls.push(`orders:${rows.length}`);const map=new Map(orders.map(o=>[o.id,o]));for(const row of rows)map.set(row.id,row);orders=[...map.values()];},
    async upsertJobs(rows:any[]){calls.push(`jobs:${rows.length}`);const map=new Map(jobs.map(j=>[j.id,j]));for(const row of rows)map.set(row.id,row);jobs=[...map.values()];},
    async upsertUsers(rows:any[]){calls.push(`users:${rows.length}`);const map=new Map(users.map(u=>[u.username,u]));for(const row of rows)map.set(row.username,row);users=[...map.values()];},
+   async upsertExpenses(rows:any[]){calls.push(`expenses:${rows.length}`);const map=new Map(expenses.map(e=>[e.id,e]));for(const row of rows)map.set(row.id,row);expenses=[...map.values()];},
    async upsertAudit(rows:unknown[]){calls.push(`audit:${(rows as unknown[]).length}`);},
    async deleteOrders(ids:string[]){calls.push(`deleteOrders:${ids.length}`);orders=orders.filter(o=>!ids.includes(o.id));},
    async deleteJobs(ids:string[]){calls.push(`deleteJobs:${ids.length}`);jobs=jobs.filter(j=>!ids.includes(j.id));},
    async deleteUsers(ids:string[]){calls.push(`deleteUsers:${ids.length}`);users=users.filter(u=>!ids.includes(u.username));},
+   async deleteExpenses(ids:string[]){calls.push(`deleteExpenses:${ids.length}`);expenses=expenses.filter(e=>!ids.includes(e.id));},
    async getMeta(){return meta;},
    async listOrders(){return orders;},
    async listJobs(){return jobs;},
    async listUsers(){return users;},
+   async listExpenses(){return expenses;},
    ...overrides
   } as unknown as SupabaseRestClient & {calls:string[]};
   return client;

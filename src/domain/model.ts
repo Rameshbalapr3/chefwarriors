@@ -1,5 +1,7 @@
 import { z } from 'zod';
-export const itemSchema=z.object({id:z.string().min(1),name:z.string().trim().min(1).max(100),category:z.string().trim().min(1).max(40),price:z.number().int().min(0).max(10000000),available:z.boolean(),image:z.number().int().min(0).max(15),photo:z.string().regex(/^product-photos\/[a-zA-Z0-9_.-]+\.jpg$/).max(120).optional(),description:z.string().max(800).optional(),options:z.array(z.object({name:z.string().min(1).max(60),values:z.array(z.string().min(1).max(60)).min(1).max(10)})).max(8).optional()});
+const productPhotoPath=/^product-photos\/[a-zA-Z0-9_.-]+\.jpg$/;
+const productPhotoDataUrl=/^data:image\/jpeg;base64,[A-Za-z0-9+/=\s]+$/;
+export const itemSchema=z.object({id:z.string().min(1),name:z.string().trim().min(1).max(100),category:z.string().trim().min(1).max(40),price:z.number().int().min(0).max(10000000),available:z.boolean(),image:z.number().int().min(0).max(15),photo:z.string().max(400000).refine(value=>productPhotoPath.test(value)||productPhotoDataUrl.test(value),'Use a saved product photo or a JPEG upload').optional(),description:z.string().max(800).optional(),options:z.array(z.object({name:z.string().min(1).max(60),values:z.array(z.string().min(1).max(60)).min(1).max(10)})).max(8).optional()});
 export type Item=z.infer<typeof itemSchema>;
 export const settingsSchema=z.object({shop:z.string().trim().min(1).max(80),address:z.string().max(200),phone:z.string().max(30),taxRate:z.number().min(0).max(100),rounding:z.enum(['paise','rupee']),width:z.enum(['58','80']),counter:z.string().max(200),kitchen:z.string().max(200),sharedPrinter:z.boolean()});
 export type Settings=z.infer<typeof settingsSchema>;
@@ -9,7 +11,9 @@ export type Money={subtotal:number;discount:number;tax:number;rounding:number;to
 export type Order={id:string;reference:string;key:string;created:string;state:'paid'|'cancelled';reason?:string;type:Checkout['type'];token:string;dailyToken?:number;payment:Checkout['payment'];tendered:number;change:number;lines:(Item & {qty:number;notes:string})[];totals:Money;settings:Settings};
 export type Job={id:string;orderId:string;kind:'counter'|'kitchen';state:'queued'|'submitting'|'submitted'|'failed'|'unknown'|'preview';printer:string;copy:boolean;reason:string;attempts:{at:string;outcome:string}[]};
 export type Role='admin'|'cashier';
-export type State={version:1;catalogVersion?:string;items:Item[];categories:string[];orders:Order[];jobs:Job[];settings:Settings;sequence:number;audit:{at:string;actor:string;action:string;record:string;reason:string}[]};
+export const expenseSchema=z.object({id:z.string().min(1),date:z.string().regex(/^\d{4}-\d{2}-\d{2}$/,'Use YYYY-MM-DD'),amount:z.number().int().min(1).max(100000000),category:z.string().trim().min(1).max(40),note:z.string().trim().max(200).optional()});
+export type Expense=z.infer<typeof expenseSchema>;
+export type State={version:1;catalogVersion?:string;items:Item[];categories:string[];orders:Order[];jobs:Job[];settings:Settings;sequence:number;expenses:Expense[];audit:{at:string;actor:string;action:string;record:string;reason:string}[]};
 export type Session={role:Role;username:string};
 export const money=(paise:number)=>new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',maximumFractionDigits:paise%100?2:0}).format(paise/100);
 export function calculate(lines:{price:number;qty:number}[],discount:number,taxRate:number,rounding:Settings['rounding']):Money {
@@ -122,4 +126,14 @@ export function monthlyOrderTotals(orders:Pick<Order,'created'>[]){
  const map=new Map<string,{month:string;count:number}>();
  for(const order of orders){const month=localMonth(order.created),row=map.get(month)||{month,count:0};row.count++;map.set(month,row);}
  return [...map.values()].sort((a,b)=>b.month.localeCompare(a.month));
+}
+/** Calendar-month P&L. Only the selected month counts — a new month starts at 0 for sales/expenses/net. */
+export function monthlyPnL(orders:Pick<Order,'created'|'state'|'totals'>[],expenses:Pick<Expense,'date'|'amount'>[],month:string){
+ const sales=orders.filter(o=>o.state==='paid'&&localMonth(o.created)===month).reduce((sum,o)=>sum+o.totals.total,0);
+ const expenseTotal=expenses.filter(e=>e.date.slice(0,7)===month).reduce((sum,e)=>sum+e.amount,0);
+ return {month,sales,expenses:expenseTotal,net:sales-expenseTotal};
+}
+export function normalizeExpenses(value:unknown):Expense[]{
+ if(!Array.isArray(value))return [];
+ return value.flatMap(row=>{const parsed=expenseSchema.safeParse(row);return parsed.success?[parsed.data]:[];});
 }

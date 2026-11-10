@@ -1,7 +1,7 @@
 import {describe,it,expect} from 'vitest';
-import {calculate,kitchenTicket,csvCell,report,localDate,localMonth,nextDailyToken,dailyTokenTaken,tokenHistoryByDay,monthlyOrderTotals,servedContents,cashierBusinessDayBounds,inCashierBusinessDay} from '../src/domain/model';
+import {calculate,kitchenTicket,csvCell,report,localDate,localMonth,nextDailyToken,dailyTokenTaken,tokenHistoryByDay,monthlyOrderTotals,monthlyPnL,servedContents,cashierBusinessDayBounds,inCashierBusinessDay} from '../src/domain/model';
 import {initialState} from '../src/domain/seed';
-import {checkout,cancel,saveItem,saveSettings,preparePrint} from '../src/application/engine';
+import {checkout,cancel,saveItem,saveSettings,saveExpense,deleteExpense,preparePrint} from '../src/application/engine';
 import {receiptHtml} from '../src/domain/receipt';
 const admin={username:'admin',role:'admin' as const},cashier={username:'cashier',role:'cashier' as const};
 const input=()=>({key:crypto.randomUUID(),lines:[{id:'cw-fried-chicken-wings-1-pc',qty:2,notes:'No onions'}],discount:0,type:'Takeaway' as const,token:'01',payment:'Cash' as const,tendered:30000});
@@ -84,5 +84,19 @@ describe('billing rules',()=>{
   expect(inCashierBusinessDay(iso(tue1500),tue1500)).toBe(true);
   expect(inCashierBusinessDay(iso(monEvening),tue1500)).toBe(false);
   expect(cashierBusinessDayBounds(tue1000).start.getTime()).toBe(at(2026,3,10,12).getTime());
+ });
+ it('lets admin record expenses and computes monthly sales minus expenses',()=>{
+  const s=initialState(),order=checkout(s,admin,input(),true);
+  const month=localMonth(order.created);
+  const expense={id:crypto.randomUUID(),date:`${month}-15`,amount:5000,category:'Stock / ingredients',note:'Oil'};
+  saveExpense(s,admin,expense);
+  expect(s.expenses).toHaveLength(1);
+  expect(monthlyPnL(s.orders,s.expenses,month)).toEqual({month,sales:12000,expenses:5000,net:7000});
+  const otherMonth=month.endsWith('01')?`${month.slice(0,5)}02`:`${month.slice(0,5)}01`;
+  expect(monthlyPnL(s.orders,s.expenses,otherMonth)).toEqual({month:otherMonth,sales:0,expenses:0,net:0});
+  expect(()=>saveExpense(s,cashier,expense)).toThrow();
+  deleteExpense(s,admin,expense.id);
+  expect(s.expenses).toHaveLength(0);
+  expect(monthlyPnL(s.orders,s.expenses,month).net).toBe(12000);
  });
 });

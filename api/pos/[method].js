@@ -19676,9 +19676,12 @@ function date4(params) {
 import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 
 // src/domain/model.ts
-var itemSchema = external_exports.object({ id: external_exports.string().min(1), name: external_exports.string().trim().min(1).max(100), category: external_exports.string().trim().min(1).max(40), price: external_exports.number().int().min(0).max(1e7), available: external_exports.boolean(), image: external_exports.number().int().min(0).max(15), photo: external_exports.string().regex(/^product-photos\/[a-zA-Z0-9_.-]+\.jpg$/).max(120).optional(), description: external_exports.string().max(800).optional(), options: external_exports.array(external_exports.object({ name: external_exports.string().min(1).max(60), values: external_exports.array(external_exports.string().min(1).max(60)).min(1).max(10) })).max(8).optional() });
+var productPhotoPath = /^product-photos\/[a-zA-Z0-9_.-]+\.jpg$/;
+var productPhotoDataUrl = /^data:image\/jpeg;base64,[A-Za-z0-9+/=\s]+$/;
+var itemSchema = external_exports.object({ id: external_exports.string().min(1), name: external_exports.string().trim().min(1).max(100), category: external_exports.string().trim().min(1).max(40), price: external_exports.number().int().min(0).max(1e7), available: external_exports.boolean(), image: external_exports.number().int().min(0).max(15), photo: external_exports.string().max(4e5).refine((value) => productPhotoPath.test(value) || productPhotoDataUrl.test(value), "Use a saved product photo or a JPEG upload").optional(), description: external_exports.string().max(800).optional(), options: external_exports.array(external_exports.object({ name: external_exports.string().min(1).max(60), values: external_exports.array(external_exports.string().min(1).max(60)).min(1).max(10) })).max(8).optional() });
 var settingsSchema = external_exports.object({ shop: external_exports.string().trim().min(1).max(80), address: external_exports.string().max(200), phone: external_exports.string().max(30), taxRate: external_exports.number().min(0).max(100), rounding: external_exports.enum(["paise", "rupee"]), width: external_exports.enum(["58", "80"]), counter: external_exports.string().max(200), kitchen: external_exports.string().max(200), sharedPrinter: external_exports.boolean() });
 var checkoutSchema = external_exports.object({ key: external_exports.string().min(8).max(100), lines: external_exports.array(external_exports.object({ id: external_exports.string(), lineId: external_exports.string().max(100).optional(), choices: external_exports.record(external_exports.string().max(60), external_exports.string().max(60)).optional(), qty: external_exports.number().int().min(1).max(999), notes: external_exports.string().max(300) })).min(1).max(100), discount: external_exports.number().int().min(0).max(1e8), type: external_exports.enum(["Dine-in", "Takeaway"]), token: external_exports.string().trim().min(1).max(40), payment: external_exports.enum(["Cash", "UPI", "Card"]), tendered: external_exports.number().int().min(0).max(1e8), simulation: external_exports.enum(["preview", "kitchen-failure", "both-fail", "unknown"]).optional() });
+var expenseSchema = external_exports.object({ id: external_exports.string().min(1), date: external_exports.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD"), amount: external_exports.number().int().min(1).max(1e8), category: external_exports.string().trim().min(1).max(40), note: external_exports.string().trim().max(200).optional() });
 function calculate(lines, discount, taxRate, rounding) {
   if (!Number.isSafeInteger(discount) || discount < 0 || !Number.isFinite(taxRate) || taxRate < 0 || taxRate > 100) throw Error("Invalid discount or tax");
   for (const l of lines) if (!Number.isSafeInteger(l.price) || l.price < 0 || !Number.isInteger(l.qty) || l.qty < 1 || l.qty > 999) throw Error("Invalid price or quantity");
@@ -19706,6 +19709,13 @@ function nextDailyToken(orders, at = (/* @__PURE__ */ new Date()).toISOString())
 function dailyTokenTaken(orders, day, token) {
   return orders.some((order) => localDate(order.created) === day && order.dailyToken === token);
 }
+function normalizeExpenses(value) {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((row) => {
+    const parsed = expenseSchema.safeParse(row);
+    return parsed.success ? [parsed.data] : [];
+  });
+}
 
 // src/application/engine.ts
 function requireAdmin(session) {
@@ -19713,6 +19723,10 @@ function requireAdmin(session) {
 }
 function audit(s, actor, action, record2, reason = "") {
   s.audit.push({ at: (/* @__PURE__ */ new Date()).toISOString(), actor: actor.username, action, record: record2, reason });
+}
+function expensesOf(s) {
+  s.expenses = normalizeExpenses(s.expenses);
+  return s.expenses;
 }
 function checkout(s, session, raw, demo) {
   const input2 = checkoutSchema.parse(raw), existing = s.orders.find((o) => o.key === input2.key);
@@ -19762,6 +19776,25 @@ function saveSettings(s, session, input2) {
   requireAdmin(session);
   s.settings = settingsSchema.parse(input2);
   audit(s, session, "settings", "shop");
+}
+function saveExpense(s, session, input2) {
+  requireAdmin(session);
+  const expense = expenseSchema.parse(input2);
+  const list = expensesOf(s);
+  const i = list.findIndex((row) => row.id === expense.id);
+  if (i < 0) list.unshift(expense);
+  else list[i] = expense;
+  s.expenses = list;
+  audit(s, session, "expense", expense.id, expense.category);
+}
+function deleteExpense(s, session, id) {
+  requireAdmin(session);
+  if (!id.trim()) throw Error("Expense not found");
+  const list = expensesOf(s);
+  const next = list.filter((row) => row.id !== id);
+  if (next.length === list.length) throw Error("Expense not found");
+  s.expenses = next;
+  audit(s, session, "expense-delete", id);
 }
 function cancel(s, session, id, reason) {
   requireAdmin(session);
@@ -19876,7 +19909,7 @@ var clientCategories = groups.map((g) => g.category);
 var clientItems = groups.flatMap((g) => g.rows.map(([name, rupees, description, options]) => ({ id: "cw-" + name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-$/, ""), name, category: g.category, price: rupees * 100, available: true, image: g.image, description: description || "", options: options || [] })));
 
 // src/domain/seed.ts
-var initialState = () => ({ version: 1, catalogVersion: CATALOG_VERSION, items: structuredClone(clientItems), categories: [...clientCategories], orders: [], jobs: [], settings: { ...SHOP, taxRate: 0, rounding: "paise", width: "80", counter: "", kitchen: "", sharedPrinter: false }, sequence: 1e3, audit: [] });
+var initialState = () => ({ version: 1, catalogVersion: CATALOG_VERSION, items: structuredClone(clientItems), categories: [...clientCategories], orders: [], jobs: [], settings: { ...SHOP, taxRate: 0, rounding: "paise", width: "80", counter: "", kitchen: "", sharedPrinter: false }, sequence: 1e3, expenses: [], audit: [] });
 
 // api/_lib/supabase.ts
 function readSupabaseEnv() {
@@ -19918,6 +19951,15 @@ async function loadState(env) {
   const payload = meta3.payload;
   const orders = await sb(env, "pos_orders?select=id,reference,request_key,payload&order=updated_at.desc");
   const jobs = await sb(env, "pos_print_jobs?select=id,order_id,kind,state,payload&order=updated_at.asc");
+  const expenseRows = await sb(env, `pos_expenses?shop_id=eq.${encodeURIComponent(env.shopId)}&select=id,shop_id,payload,updated_at&order=updated_at.desc`);
+  let expenses = normalizeExpenses(expenseRows.map((row) => row.payload));
+  if (!expenses.length) {
+    const legacy = normalizeExpenses(payload.expenses);
+    if (legacy.length) {
+      await upsertExpenses(env, legacy);
+      expenses = legacy;
+    }
+  }
   const state = {
     version: 1,
     catalogVersion: typeof payload.catalogVersion === "string" ? payload.catalogVersion : initialState().catalogVersion,
@@ -19925,6 +19967,7 @@ async function loadState(env) {
     categories: Array.isArray(payload.categories) ? payload.categories : initialState().categories,
     settings: payload.settings ? settingsSchema.parse(payload.settings) : initialState().settings,
     sequence: Number.isInteger(payload.sequence) ? Number(payload.sequence) : 1e3,
+    expenses,
     orders: orders.map((row) => row.payload).filter(Boolean),
     jobs: jobs.map((row) => row.payload).filter(Boolean),
     audit: []
@@ -19934,6 +19977,14 @@ async function loadState(env) {
 async function saveMeta(env, state, revision) {
   const payload = { version: state.version, catalogVersion: state.catalogVersion, items: state.items, categories: state.categories, settings: state.settings, sequence: state.sequence };
   await sb(env, "pos_meta?on_conflict=id", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ id: env.shopId, payload, revision, updated_at: (/* @__PURE__ */ new Date()).toISOString() }) });
+}
+async function upsertExpenses(env, expenses) {
+  if (!expenses.length) return;
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  await sb(env, "pos_expenses?on_conflict=id", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify(expenses.map((e) => ({ id: e.id, shop_id: env.shopId, payload: e, updated_at: now }))) });
+}
+async function deleteExpenseRow(env, id) {
+  await sb(env, `pos_expenses?id=eq.${encodeURIComponent(id)}&shop_id=eq.${encodeURIComponent(env.shopId)}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
 }
 async function upsertOrder(env, order) {
   await sb(env, "pos_orders?on_conflict=id", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ id: order.id, reference: order.reference, request_key: order.key, payload: order, updated_at: order.created || (/* @__PURE__ */ new Date()).toISOString() }) });
@@ -20044,6 +20095,22 @@ async function invokeCloudPos(method, args, session) {
       saveSettings(state, actor, settingsSchema.parse(args[0]));
       const metaRows = await sb(env, `pos_meta?id=eq.${encodeURIComponent(env.shopId)}&select=revision`);
       await saveMeta(env, state, Number(metaRows[0]?.revision || 1) + 1);
+      return { result: void 0, session };
+    }
+    case "saveExpense": {
+      const actor = authed();
+      const expense = expenseSchema.parse(args[0]);
+      const state = await loadState(env);
+      saveExpense(state, actor, expense);
+      await upsertExpenses(env, [expense]);
+      return { result: void 0, session };
+    }
+    case "deleteExpense": {
+      const actor = authed();
+      const id = external_exports.string().parse(args[0]);
+      const state = await loadState(env);
+      deleteExpense(state, actor, id);
+      await deleteExpenseRow(env, id);
       return { result: void 0, session };
     }
     case "addUser": {

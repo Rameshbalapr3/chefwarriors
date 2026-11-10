@@ -5,6 +5,7 @@ export type RemoteOrder={id:string;reference:string;request_key:string;payload:u
 export type RemoteJob={id:string;order_id:string;kind:string;state:string;payload:unknown;updated_at:string};
 export type RemoteUser={username:string;salt:string;hash:string;role:string;active:boolean;updated_at:string};
 export type RemoteAudit={fingerprint:string;payload:unknown};
+export type RemoteExpense={id:string;shop_id:string;payload:unknown;updated_at:string};
 
 type FetchLike=typeof fetch;
 
@@ -47,11 +48,18 @@ export class SupabaseRestClient{
   if(!rows.length)return Promise.resolve();
   return this.request('pos_audit?on_conflict=fingerprint',{method:'POST',headers:this.headers({Prefer:'resolution=merge-duplicates,return=minimal'}),body:JSON.stringify(rows)});
  }
+ upsertExpenses(rows:RemoteExpense[]){
+  if(!rows.length)return Promise.resolve();
+  return this.request('pos_expenses?on_conflict=id',{method:'POST',headers:this.headers({Prefer:'resolution=merge-duplicates,return=minimal'}),body:JSON.stringify(rows)});
+ }
  getMeta(){
   return this.request<RemoteMeta[]>(`pos_meta?id=eq.${encodeURIComponent(this.config.shopId)}&select=id,payload,updated_at,revision`);
  }
  listOrders(){
   return this.request<RemoteOrder[]>('pos_orders?select=id,reference,request_key,payload,updated_at&order=updated_at.asc');
+ }
+ listExpenses(){
+  return this.request<RemoteExpense[]>(`pos_expenses?shop_id=eq.${encodeURIComponent(this.config.shopId)}&select=id,shop_id,payload,updated_at&order=updated_at.asc`);
  }
  listJobs(){
   return this.request<RemoteJob[]>('pos_print_jobs?select=id,order_id,kind,state,payload,updated_at&order=updated_at.asc');
@@ -71,5 +79,9 @@ export class SupabaseRestClient{
  deleteUsers(usernames:string[]){
   if(!usernames.length)return Promise.resolve();
   return this.request(`pos_users?username=in.(${this.inFilter(usernames)})`,{method:'DELETE',headers:this.headers({Prefer:'return=minimal'})});
+ }
+ deleteExpenses(ids:string[]){
+  if(!ids.length)return Promise.resolve();
+  return this.request(`pos_expenses?id=in.(${this.inFilter(ids)})`,{method:'DELETE',headers:this.headers({Prefer:'return=minimal'})});
  }
 }

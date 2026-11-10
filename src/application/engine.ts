@@ -1,6 +1,7 @@
-import {checkoutSchema,itemSchema,settingsSchema,calculate,dailyTokenTaken,localDate,nextDailyToken,type State,type Session,type Checkout,type Order,type Item,type Settings,type Job} from '../domain/model';
+import {checkoutSchema,expenseSchema,itemSchema,settingsSchema,calculate,dailyTokenTaken,localDate,nextDailyToken,normalizeExpenses,type State,type Session,type Checkout,type Order,type Item,type Settings,type Job,type Expense} from '../domain/model';
 export function requireAdmin(session:Session){if(session.role!=='admin')throw Error('Administrator permission required');}
 export function audit(s:State,actor:Session,action:string,record:string,reason=''){s.audit.push({at:new Date().toISOString(),actor:actor.username,action,record,reason});}
+function expensesOf(s:State){s.expenses=normalizeExpenses(s.expenses);return s.expenses;}
 export function checkout(s:State,session:Session,raw:Checkout,demo:boolean):Order{
  const input=checkoutSchema.parse(raw),existing=s.orders.find(o=>o.key===input.key);if(existing)return existing;
  const variants=input.lines.map(l=>l.id+JSON.stringify(Object.entries(l.choices||{}).sort()));
@@ -23,6 +24,24 @@ export function saveItem(s:State,session:Session,input:Item){
  requireAdmin(session);s.items[i]=item;audit(s,session,'menu',item.id);
 }
 export function saveSettings(s:State,session:Session,input:Settings){requireAdmin(session);s.settings=settingsSchema.parse(input);audit(s,session,'settings','shop');}
+export function saveExpense(s:State,session:Session,input:Expense){
+ requireAdmin(session);
+ const expense=expenseSchema.parse(input);
+ const list=expensesOf(s);
+ const i=list.findIndex(row=>row.id===expense.id);
+ if(i<0)list.unshift(expense);else list[i]=expense;
+ s.expenses=list;
+ audit(s,session,'expense',expense.id,expense.category);
+}
+export function deleteExpense(s:State,session:Session,id:string){
+ requireAdmin(session);
+ if(!id.trim())throw Error('Expense not found');
+ const list=expensesOf(s);
+ const next=list.filter(row=>row.id!==id);
+ if(next.length===list.length)throw Error('Expense not found');
+ s.expenses=next;
+ audit(s,session,'expense-delete',id);
+}
 export function cancel(s:State,session:Session,id:string,reason:string){requireAdmin(session);if(!reason.trim()||reason.length>300)throw Error('Enter a cancellation reason (1–300 characters)');const order=s.orders.find(o=>o.id===id);if(!order||order.state!=='paid')throw Error('Order cannot be cancelled');order.state='cancelled';order.reason=reason;audit(s,session,'cancel',id,reason);}
 export function preparePrint(s:State,session:Session,id:string,reason=''):Job{
  const job=s.jobs.find(j=>j.id===id);if(!job)throw Error('Print job not found');if(job.state==='submitting')throw Error('Print submission is in progress');

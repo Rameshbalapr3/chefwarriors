@@ -1,7 +1,7 @@
 import {randomBytes,scryptSync,timingSafeEqual} from 'node:crypto';
 import {z} from 'zod';
 import * as engine from '../../src/application/engine';
-import {checkoutSchema,itemSchema,settingsSchema,type Session,type State} from '../../src/domain/model';
+import {checkoutSchema,expenseSchema,itemSchema,normalizeExpenses,settingsSchema,type Session,type State} from '../../src/domain/model';
 import {initialState} from '../../src/domain/seed';
 import {readSupabaseEnv,sb,type SupabaseEnv} from './supabase';
 
@@ -9,6 +9,7 @@ type UserRow={username:string;salt:string;hash:string;role:'admin'|'cashier';act
 type MetaRow={id:string;payload:unknown;revision:number;updated_at:string};
 type OrderRow={id:string;reference:string;request_key:string;payload:unknown};
 type JobRow={id:string;order_id:string;kind:string;state:string;payload:unknown};
+type ExpenseRow={id:string;shop_id:string;payload:unknown;updated_at:string};
 
 function hashPassword(password:string,salt:string){
  return scryptSync(password,salt,64,{N:32768,r:8,p:1,maxmem:64*1024*1024}).toString('hex');
@@ -25,6 +26,16 @@ async function loadState(env:SupabaseEnv):Promise<State>{
  const payload=meta.payload as Partial<State>;
  const orders=await sb<OrderRow[]>(env,'pos_orders?select=id,reference,request_key,payload&order=updated_at.desc');
  const jobs=await sb<JobRow[]>(env,'pos_print_jobs?select=id,order_id,kind,state,payload&order=updated_at.asc');
+ const expenseRows=await sb<ExpenseRow[]>(env,`pos_expenses?shop_id=eq.${encodeURIComponent(env.shopId)}&select=id,shop_id,payload,updated_at&order=updated_at.desc`);
+ let expenses=normalizeExpenses(expenseRows.map(row=>row.payload));
+ // One-time move of legacy expenses that lived inside pos_meta.payload.
+ if(!expenses.length){
+  const legacy=normalizeExpenses(payload.expenses);
+  if(legacy.length){
+   await upsertExpenses(env,legacy);
+   expenses=legacy;
+  }
+ }
  const state:State={
   version:1,
   catalogVersion:typeof payload.catalogVersion==='string'?payload.catalogVersion:initialState().catalogVersion,
@@ -32,6 +43,7 @@ async function loadState(env:SupabaseEnv):Promise<State>{
   categories:Array.isArray(payload.categories)?payload.categories as string[]:initialState().categories,
   settings:payload.settings?settingsSchema.parse(payload.settings):initialState().settings,
   sequence:Number.isInteger(payload.sequence)?Number(payload.sequence):1000,
+  expenses,
   orders:orders.map(row=>row.payload as State['orders'][number]).filter(Boolean),
   jobs:jobs.map(row=>row.payload as State['jobs'][number]).filter(Boolean),
   audit:[]
@@ -42,6 +54,16 @@ async function loadState(env:SupabaseEnv):Promise<State>{
 async function saveMeta(env:SupabaseEnv,state:State,revision:number){
  const payload={version:state.version,catalogVersion:state.catalogVersion,items:state.items,categories:state.categories,settings:state.settings,sequence:state.sequence};
  await sb(env,'pos_meta?on_conflict=id',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({id:env.shopId,payload,revision,updated_at:new Date().toISOString()})});
+}
+
+async function upsertExpenses(env:SupabaseEnv,expenses:State['expenses']){
+ if(!expenses.length)return;
+ const now=new Date().toISOString();
+ await sb(env,'pos_expenses?on_conflict=id',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(expenses.map(e=>({id:e.id,shop_id:env.shopId,payload:e,updated_at:now})))});
+}
+
+async function deleteExpenseRow(env:SupabaseEnv,id:string){
+ await sb(env,`pos_expenses?id=eq.${encodeURIComponent(id)}&shop_id=eq.${encodeURIComponent(env.shopId)}`,{method:'DELETE',headers:{Prefer:'return=minimal'}});
 }
 
 async function upsertOrder(env:SupabaseEnv,order:State['orders'][number]){
@@ -154,6 +176,22 @@ export async function invokeCloudPos(method:string,args:unknown[],session:Sessio
    engine.saveSettings(state,actor,settingsSchema.parse(args[0]));
    const metaRows=await sb<MetaRow[]>(env,`pos_meta?id=eq.${encodeURIComponent(env.shopId)}&select=revision`);
    await saveMeta(env,state,Number(metaRows[0]?.revision||1)+1);
+   return {result:undefined,session};
+  }
+  case 'saveExpense':{
+   const actor=authed();
+   const expense=expenseSchema.parse(args[0]);
+   const state=await loadState(env);
+   engine.saveExpense(state,actor,expense);
+   await upsertExpenses(env,[expense]);
+   return {result:undefined,session};
+  }
+  case 'deleteExpense':{
+   const actor=authed();
+   const id=z.string().parse(args[0]);
+   const state=await loadState(env);
+   engine.deleteExpense(state,actor,id);
+   await deleteExpenseRow(env,id);
    return {result:undefined,session};
   }
   case 'addUser':{

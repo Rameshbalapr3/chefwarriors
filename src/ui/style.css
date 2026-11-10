@@ -598,6 +598,14 @@
   .sales-order-types>div{grid-template-columns:minmax(0,1fr)}
 }
 @media(max-width:420px){.sales-metrics{grid-template-columns:minmax(0,1fr)}.sales-export{flex-direction:column}.sales-panel{padding:.8em}}
+.expenses-metrics{grid-template-columns:repeat(3,minmax(0,1fr))}
+.expenses-metrics>div:nth-child(2) strong{color:#f0b7a0}
+.expense-net-negative{color:#ff8e8e!important}
+.expense-form{display:grid;gap:.85em;margin-top:.5em}
+.expense-form button{justify-self:start;display:inline-flex;align-items:center;gap:.45em}
+.expense-empty{margin:1em 0 0;border:0;background:transparent;padding:0}
+@media(max-width:1100px){.expenses-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:420px){.expenses-metrics{grid-template-columns:minmax(0,1fr)}}
 /* Settings: grouped forms with readable POS-sized controls. */
 .settings-page{font-size:clamp(16px,1vw,36px);min-width:0;padding-bottom:1em}
 .settings-page .page-title{margin:1em 0;flex-wrap:wrap}

@@ -1,8 +1,8 @@
 import {createHash} from 'node:crypto';
 import type {DatabaseSync} from 'node:sqlite';
 import type {Store} from '../database/store';
-import type {Order,State} from '../../src/domain/model';
-import {itemSchema,settingsSchema} from '../../src/domain/model';
+import type {Expense,Order,State} from '../../src/domain/model';
+import {expenseSchema,itemSchema,normalizeExpenses,settingsSchema} from '../../src/domain/model';
 import {SupabaseRestClient} from './client';
 import type {SupabaseSyncConfig} from './config';
 
@@ -86,33 +86,40 @@ export function createCloudSync(store:Store,config:SupabaseSyncConfig,client=new
   const now=new Date().toISOString();
   const localOrderIds=new Set(state.orders.map(o=>o.id));
   const localJobIds=new Set(state.jobs.map(j=>j.id));
+  const localExpenseIds=new Set(normalizeExpenses(state.expenses).map(e=>e.id));
   const users=store.db.prepare('SELECT username,salt,hash,role,active FROM users').all().map((u:any)=>({username:String(u.username),salt:String(u.salt),hash:String(u.hash),role:String(u.role),active:Number(u.active)===1,updated_at:now}));
   const localUsernames=new Set(users.map(u=>u.username));
 
   const knownOrders=readKnown(store.db,'orders');
   const knownJobs=readKnown(store.db,'jobs');
   const knownUsers=readKnown(store.db,'users');
+  const knownExpenses=readKnown(store.db,'expenses');
   const deleteOrderIds=[...knownOrders].filter(id=>!localOrderIds.has(id));
   const deleteJobIds=[...knownJobs].filter(id=>!localJobIds.has(id));
   const deleteUsernames=[...knownUsers].filter(name=>!localUsernames.has(name));
+  const deleteExpenseIds=[...knownExpenses].filter(id=>!localExpenseIds.has(id));
 
   // Remote FK: remove jobs before orders.
   await client.deleteJobs(deleteJobIds);
   await client.deleteOrders(deleteOrderIds);
   await client.deleteUsers(deleteUsernames);
+  await client.deleteExpenses(deleteExpenseIds);
 
   const orders=state.orders.map(o=>({id:o.id,reference:o.reference,request_key:o.key,payload:o,updated_at:o.created||now}));
   const jobs=state.jobs.map(j=>({id:j.id,order_id:j.orderId,kind:j.kind,state:j.state,payload:j,updated_at:j.attempts.slice(-1)[0]?.at||now}));
+  const expenses=normalizeExpenses(state.expenses).map(e=>({id:e.id,shop_id:config.shopId,payload:e,updated_at:now}));
   const audit=state.audit.map(a=>({fingerprint:fingerprint(a),payload:a}));
   await client.upsertMeta(metaPayload,revision);
   await client.upsertOrders(orders);
   await client.upsertJobs(jobs);
   await client.upsertUsers(users);
+  await client.upsertExpenses(expenses);
   await client.upsertAudit(audit);
 
   writeKnown(store.db,'orders',localOrderIds);
   writeKnown(store.db,'jobs',localJobIds);
   writeKnown(store.db,'users',localUsernames);
+  writeKnown(store.db,'expenses',localExpenseIds);
   store.db.prepare('UPDATE sync_cursor SET dirty=0,last_push_at=?,revision=? WHERE id=1').run(now,revision);
  }
 
@@ -124,22 +131,27 @@ export function createCloudSync(store:Store,config:SupabaseSyncConfig,client=new
   const remoteOrders=await client.listOrders();
   const remoteJobs=await client.listJobs();
   const remoteUsers=await client.listUsers();
+  const remoteExpenses=await client.listExpenses();
   const remoteOrderIds=new Set(remoteOrders.map(o=>o.id));
   const remoteJobIds=new Set(remoteJobs.map(j=>j.id));
   const remoteUsernames=new Set(remoteUsers.map(u=>u.username));
+  const remoteExpenseIds=new Set(remoteExpenses.map(e=>e.id));
   const knownOrders=readKnown(store.db,'orders');
   const knownJobs=readKnown(store.db,'jobs');
   const knownUsers=readKnown(store.db,'users');
+  const knownExpenses=readKnown(store.db,'expenses');
   // Only delete locally when we previously saw the row on remote (avoids wiping unsynced local creates).
   const removeOrderIds=new Set([...knownOrders].filter(id=>!remoteOrderIds.has(id)));
   const removeJobIds=new Set([...knownJobs].filter(id=>!remoteJobIds.has(id)));
   const removeUsernames=[...knownUsers].filter(name=>!remoteUsernames.has(name));
+  const removeExpenseIds=new Set([...knownExpenses].filter(id=>!remoteExpenseIds.has(id)));
 
   applyingRemote=true;
   try{
    store.transaction(s=>{
     if(removeOrderIds.size)s.orders=s.orders.filter(o=>!removeOrderIds.has(o.id));
     if(removeJobIds.size||removeOrderIds.size)s.jobs=s.jobs.filter(j=>!removeJobIds.has(j.id)&&!removeOrderIds.has(j.orderId));
+    if(removeExpenseIds.size)s.expenses=normalizeExpenses(s.expenses).filter(e=>!removeExpenseIds.has(e.id));
 
     const byId=new Map(s.orders.map(o=>[o.id,o]));
     const byKey=new Map(s.orders.map(o=>[o.key,o]));
@@ -167,6 +179,17 @@ export function createCloudSync(store:Store,config:SupabaseSyncConfig,client=new
      s.jobs.push(job);
      jobById.set(job.id,job);
     }
+
+    const expenseById=new Map(normalizeExpenses(s.expenses).map(e=>[e.id,e]));
+    for(const row of remoteExpenses){
+     const parsed=expenseSchema.safeParse(row.payload);
+     if(!parsed.success||parsed.data.id!==row.id)continue;
+     const expense=parsed.data as Expense;
+     const existing=expenseById.get(row.id);
+     if(existing){Object.assign(existing,expense);continue;}
+     expenseById.set(expense.id,expense);
+    }
+    s.expenses=[...expenseById.values()];
 
     if(remoteMeta?.payload&&(!cursor.last_remote_updated_at||remoteMeta.updated_at>cursor.last_remote_updated_at)){
      const payload=remoteMeta.payload as Partial<State>;
@@ -205,6 +228,7 @@ export function createCloudSync(store:Store,config:SupabaseSyncConfig,client=new
   writeKnown(store.db,'orders',remoteOrderIds);
   writeKnown(store.db,'jobs',remoteJobIds);
   writeKnown(store.db,'users',remoteUsernames);
+  writeKnown(store.db,'expenses',remoteExpenseIds);
   const now=new Date().toISOString();
   store.db.prepare('UPDATE sync_cursor SET last_pull_at=?, last_remote_updated_at=COALESCE(?, last_remote_updated_at) WHERE id=1').run(now,remoteMeta?.updated_at||null);
  }

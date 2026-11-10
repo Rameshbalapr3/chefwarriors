@@ -8,7 +8,7 @@ import type {Result} from '../src/contracts/services';
 import {Store} from './database/store';
 import {dispatch} from './printing/printer';
 import * as engine from '../src/application/engine';
-import {checkoutSchema,itemSchema,settingsSchema,type Session,type Job} from '../src/domain/model';
+import {checkoutSchema,expenseSchema,itemSchema,settingsSchema,type Session,type Job} from '../src/domain/model';
 import {loadSyncEnv,readSupabaseSyncConfig} from './sync/config';
 import {createCloudSync,createNoopCloudSync,type CloudSync} from './sync/engine';
 if(!app.isPackaged&&process.env.POS_TEST_DATA)app.setPath('userData',process.env.POS_TEST_DATA);
@@ -37,6 +37,8 @@ function register(){const handlers:Record<string,(...args:any[])=>unknown>={
  saveItem:raw=>{const incoming=itemSaveSchema.parse(raw);const photo=persistProductPhoto(incoming.id,incoming.photo);const item={...incoming,...(photo?{photo}:{})};if(!photo)delete (item as {photo?:string}).photo;return store.transaction(s=>engine.saveItem(s,auth(),itemSchema.parse(item)));},
  saveCategory:(raw,old)=>{admin();const name=z.string().trim().min(1).max(40).parse(raw),previous=z.string().max(40).optional().parse(old);store.transaction(s=>{if(s.categories.includes(name))throw Error('Category name already exists');if(previous){if(!s.categories.includes(previous))throw Error('Category not found');s.categories=s.categories.map(c=>c===previous?name:c);s.items.forEach(i=>{if(i.category===previous)i.category=name;});}else s.categories.push(name);engine.audit(s,auth(),'category',name);});},
  saveSettings:raw=>store.transaction(s=>engine.saveSettings(s,auth(),settingsSchema.parse(raw))),
+ saveExpense:raw=>store.transaction(s=>engine.saveExpense(s,auth(),expenseSchema.parse(raw))),
+ deleteExpense:id=>store.transaction(s=>engine.deleteExpense(s,auth(),text.parse(id))),
  cancel:(id,reason)=>store.transaction(s=>engine.cancel(s,auth(),text.parse(id),text.parse(reason))),
  printers:async()=>{admin();return (await win.webContents.getPrintersAsync()).map(p=>p.name);},
  print:(id,reason)=>printJob(text.parse(id),z.string().max(300).optional().parse(reason)),
