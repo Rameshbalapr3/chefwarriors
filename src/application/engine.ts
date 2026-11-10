@@ -16,7 +16,12 @@ export function checkout(s:State,session:Session,raw:Checkout,demo:boolean):Orde
  for(let i=0;i<2;i++)enqueue('counter',i);
  audit(s,session,'checkout',order.id);return order;
 }
-export function saveItem(s:State,session:Session,input:Item){requireAdmin(session);const item=itemSchema.parse(input);if(!s.categories.includes(item.category))throw Error('Choose a valid category');const i=s.items.findIndex(p=>p.id===item.id);if(i<0)s.items.push(item);else s.items[i]=item;audit(s,session,'menu',item.id);}
+export function saveItem(s:State,session:Session,input:Item){
+ const item=itemSchema.parse(input);if(!s.categories.includes(item.category))throw Error('Choose a valid category');
+ const i=s.items.findIndex(p=>p.id===item.id);
+ if(i<0){s.items.push(item);audit(s,session,'menu',item.id);return;}
+ requireAdmin(session);s.items[i]=item;audit(s,session,'menu',item.id);
+}
 export function saveSettings(s:State,session:Session,input:Settings){requireAdmin(session);s.settings=settingsSchema.parse(input);audit(s,session,'settings','shop');}
 export function cancel(s:State,session:Session,id:string,reason:string){requireAdmin(session);if(!reason.trim()||reason.length>300)throw Error('Enter a cancellation reason (1–300 characters)');const order=s.orders.find(o=>o.id===id);if(!order||order.state!=='paid')throw Error('Order cannot be cancelled');order.state='cancelled';order.reason=reason;audit(s,session,'cancel',id,reason);}
 export function preparePrint(s:State,session:Session,id:string,reason=''):Job{

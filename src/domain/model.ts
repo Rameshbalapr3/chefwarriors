@@ -86,6 +86,21 @@ export function report(orders:Order[]){const paid=orders.filter(o=>o.state==='pa
 export function csvCell(value:unknown){let s=String(value);if(/^[\s]*[=+@\-\t\r]/.test(s))s="'"+s;return '"'+s.replaceAll('"','""')+'"';}
 export function localDate(value:string){const d=new Date(value);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
 export function localMonth(value:string){return localDate(value).slice(0,7);}
+/** Cashier order-history day: 12:00 PM inclusive through 2:00 AM next calendar morning exclusive. */
+export function cashierBusinessDayBounds(at:Date|string|number=new Date()){
+ const now=new Date(at);
+ const minutes=now.getHours()*60+now.getMinutes()+now.getSeconds()/60+now.getMilliseconds()/60000;
+ const start=new Date(now);
+ if(minutes<2*60)start.setDate(start.getDate()-1);
+ start.setHours(12,0,0,0);
+ const end=new Date(start);end.setDate(end.getDate()+1);end.setHours(2,0,0,0);
+ return {start,end};
+}
+export function inCashierBusinessDay(created:string,at:Date|string|number=new Date()){
+ const {start,end}=cashierBusinessDayBounds(at);
+ const time=new Date(created).getTime();
+ return time>=start.getTime()&&time<end.getTime();
+}
 function assignedDailyToken(value:unknown):value is number{return Number.isInteger(value)&&Number(value)>=1;}
 export function nextDailyToken(orders:Pick<Order,'created'|'dailyToken'>[],at=new Date().toISOString()){
  const day=localDate(at);let max=0;

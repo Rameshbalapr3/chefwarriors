@@ -1,5 +1,5 @@
 import {describe,it,expect} from 'vitest';
-import {calculate,kitchenTicket,csvCell,report,localDate,localMonth,nextDailyToken,dailyTokenTaken,tokenHistoryByDay,monthlyOrderTotals,servedContents} from '../src/domain/model';
+import {calculate,kitchenTicket,csvCell,report,localDate,localMonth,nextDailyToken,dailyTokenTaken,tokenHistoryByDay,monthlyOrderTotals,servedContents,cashierBusinessDayBounds,inCashierBusinessDay} from '../src/domain/model';
 import {initialState} from '../src/domain/seed';
 import {checkout,cancel,saveItem,saveSettings,preparePrint} from '../src/application/engine';
 import {receiptHtml} from '../src/domain/receipt';
@@ -17,6 +17,13 @@ describe('billing rules',()=>{
  it('keeps discount and tax on the customer bill when they apply',()=>{const s=initialState();s.settings.taxRate=5;const o=checkout(s,admin,{...input(),discount:4000},true);const html=receiptHtml(o,'counter');expect(html).toContain('Discount');expect(html).toContain('Tax (5%)');expect(html).toContain('TOTAL');});
  it('excludes cancellations and reconciles payments',()=>{const s=initialState();const a=checkout(s,admin,input(),true);checkout(s,admin,{...input(),payment:'UPI'},true);cancel(s,admin,a.id,'Customer changed mind');const r=report(s.orders);expect(r.sales).toBe(12000);expect(r.cancelled).toBe(12000);expect(r.payments.reduce((sum,p)=>sum+p.total,0)).toBe(r.sales);});
  it('enforces service permissions and required reasons',()=>{const s=initialState(),o=checkout(s,cashier,input(),true);expect(()=>cancel(s,cashier,o.id,'Reason')).toThrow();expect(()=>cancel(s,admin,o.id,'')).toThrow();expect(()=>saveItem(s,cashier,s.items[0])).toThrow();expect(()=>saveSettings(s,cashier,s.settings)).toThrow();});
+ it('allows cashiers to add products but not edit existing ones',()=>{
+  const s=initialState(),added={id:crypto.randomUUID(),name:'Cashier Special',category:s.categories[0],price:9900,available:true,image:5};
+  saveItem(s,cashier,added);
+  expect(s.items.some(item=>item.id===added.id&&item.name==='Cashier Special')).toBe(true);
+  expect(()=>saveItem(s,cashier,{...added,price:11000})).toThrow();
+  expect(()=>saveItem(s,cashier,{...s.items[0],price:s.items[0].price+100})).toThrow();
+ });
  it('retries only failed job; unknown needs reviewed copy',()=>{const s=initialState();checkout(s,admin,{...input(),simulation:'kitchen-failure'},true);expect(s.jobs[0].state).toBe('preview');const j=preparePrint(s,cashier,s.jobs[1].id);expect(j.id).toBe(s.jobs[1].id);expect(s.jobs).toHaveLength(2);s.jobs[1].state='unknown';expect(()=>preparePrint(s,admin,j.id)).toThrow();const copy=preparePrint(s,admin,j.id,'Checked printer; no ticket');expect(copy.copy).toBe(true);expect(s.orders).toHaveLength(1);expect(s.jobs).toHaveLength(3);});
  it('escapes spreadsheet formulas',()=>{expect(csvCell('=CMD()')).toBe('"\'=CMD()"');expect(csvCell(' hello')).toBe('" hello"');expect(csvCell('a"b')).toBe('"a""b"');});
  it('prints chosen combo items and omits unused alternatives',()=>{
@@ -63,5 +70,19 @@ describe('billing rules',()=>{
   expect(dailyTokenTaken([{created:now,dailyToken:1}],day,1)).toBe(true);
   expect(dailyTokenTaken([{created:now,dailyToken:1}],day,2)).toBe(false);
   expect(dailyTokenTaken([{created:'2000-01-01T12:00:00',dailyToken:1}],day,1)).toBe(false);
+ });
+ it('scopes cashier history to noon through 2 AM',()=>{
+  const at=(y:number,m:number,d:number,h:number,min=0)=>new Date(y,m-1,d,h,min,0,0);
+  const iso=(value:Date)=>value.toISOString();
+  const monNoon=at(2026,3,9,12),monEvening=at(2026,3,9,20),tue0130=at(2026,3,10,1,30),tue0200=at(2026,3,10,2),tue1000=at(2026,3,10,10),tue1500=at(2026,3,10,15);
+  expect(cashierBusinessDayBounds(tue0130).start.getTime()).toBe(monNoon.getTime());
+  expect(cashierBusinessDayBounds(tue0130).end.getTime()).toBe(tue0200.getTime());
+  expect(inCashierBusinessDay(iso(monEvening),tue0130)).toBe(true);
+  expect(inCashierBusinessDay(iso(tue0130),tue0130)).toBe(true);
+  expect(inCashierBusinessDay(iso(monEvening),tue0200)).toBe(false);
+  expect(inCashierBusinessDay(iso(monEvening),tue1000)).toBe(false);
+  expect(inCashierBusinessDay(iso(tue1500),tue1500)).toBe(true);
+  expect(inCashierBusinessDay(iso(monEvening),tue1500)).toBe(false);
+  expect(cashierBusinessDayBounds(tue1000).start.getTime()).toBe(at(2026,3,10,12).getTime());
  });
 });
