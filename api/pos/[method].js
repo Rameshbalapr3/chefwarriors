@@ -19678,7 +19678,8 @@ import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 // src/domain/model.ts
 var productPhotoPath = /^product-photos\/[a-zA-Z0-9_.-]+\.jpg$/;
 var productPhotoDataUrl = /^data:image\/jpeg;base64,[A-Za-z0-9+/=\s]+$/;
-var itemSchema = external_exports.object({ id: external_exports.string().min(1), name: external_exports.string().trim().min(1).max(100), category: external_exports.string().trim().min(1).max(40), price: external_exports.number().int().min(0).max(1e7), available: external_exports.boolean(), image: external_exports.number().int().min(0).max(15), photo: external_exports.string().max(4e5).refine((value) => productPhotoPath.test(value) || productPhotoDataUrl.test(value), "Use a saved product photo or a JPEG upload").optional(), description: external_exports.string().max(800).optional(), options: external_exports.array(external_exports.object({ name: external_exports.string().min(1).max(60), values: external_exports.array(external_exports.string().min(1).max(60)).min(1).max(10) })).max(8).optional() });
+var productPhotoHttp = /^https:\/\/\S{8,2000}$/i;
+var itemSchema = external_exports.object({ id: external_exports.string().min(1), name: external_exports.string().trim().min(1).max(100), category: external_exports.string().trim().min(1).max(40), price: external_exports.number().int().min(0).max(1e7), available: external_exports.boolean(), image: external_exports.number().int().min(0).max(15), photo: external_exports.string().max(4e5).refine((value) => productPhotoPath.test(value) || productPhotoDataUrl.test(value) || productPhotoHttp.test(value), "Use a saved product photo, JPEG upload, or cloud photo URL").optional(), description: external_exports.string().max(800).optional(), options: external_exports.array(external_exports.object({ name: external_exports.string().min(1).max(60), values: external_exports.array(external_exports.string().min(1).max(60)).min(1).max(10) })).max(8).optional() });
 var settingsSchema = external_exports.object({ shop: external_exports.string().trim().min(1).max(80), address: external_exports.string().max(200), phone: external_exports.string().max(30), taxRate: external_exports.number().min(0).max(100), rounding: external_exports.enum(["paise", "rupee"]), width: external_exports.enum(["58", "80"]), counter: external_exports.string().max(200), kitchen: external_exports.string().max(200), sharedPrinter: external_exports.boolean() });
 var checkoutSchema = external_exports.object({ key: external_exports.string().min(8).max(100), lines: external_exports.array(external_exports.object({ id: external_exports.string(), lineId: external_exports.string().max(100).optional(), choices: external_exports.record(external_exports.string().max(60), external_exports.string().max(60)).optional(), qty: external_exports.number().int().min(1).max(999), notes: external_exports.string().max(300) })).min(1).max(100), discount: external_exports.number().int().min(0).max(1e8), type: external_exports.enum(["Dine-in", "Takeaway"]), token: external_exports.string().trim().min(1).max(40), payment: external_exports.enum(["Cash", "UPI", "Card"]), tendered: external_exports.number().int().min(0).max(1e8), simulation: external_exports.enum(["preview", "kitchen-failure", "both-fail", "unknown"]).optional() });
 var expenseSchema = external_exports.object({ id: external_exports.string().min(1), date: external_exports.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD"), amount: external_exports.number().int().min(1).max(1e8), category: external_exports.string().trim().min(1).max(40), note: external_exports.string().trim().max(200).optional() });
@@ -19723,10 +19724,6 @@ function requireAdmin(session) {
 }
 function audit(s, actor, action, record2, reason = "") {
   s.audit.push({ at: (/* @__PURE__ */ new Date()).toISOString(), actor: actor.username, action, record: record2, reason });
-}
-function expensesOf(s) {
-  s.expenses = normalizeExpenses(s.expenses);
-  return s.expenses;
 }
 function checkout(s, session, raw, demo) {
   const input2 = checkoutSchema.parse(raw), existing = s.orders.find((o) => o.key === input2.key);
@@ -19776,25 +19773,6 @@ function saveSettings(s, session, input2) {
   requireAdmin(session);
   s.settings = settingsSchema.parse(input2);
   audit(s, session, "settings", "shop");
-}
-function saveExpense(s, session, input2) {
-  requireAdmin(session);
-  const expense = expenseSchema.parse(input2);
-  const list = expensesOf(s);
-  const i = list.findIndex((row) => row.id === expense.id);
-  if (i < 0) list.unshift(expense);
-  else list[i] = expense;
-  s.expenses = list;
-  audit(s, session, "expense", expense.id, expense.category);
-}
-function deleteExpense(s, session, id) {
-  requireAdmin(session);
-  if (!id.trim()) throw Error("Expense not found");
-  const list = expensesOf(s);
-  const next = list.filter((row) => row.id !== id);
-  if (next.length === list.length) throw Error("Expense not found");
-  s.expenses = next;
-  audit(s, session, "expense-delete", id);
 }
 function cancel(s, session, id, reason) {
   requireAdmin(session);
@@ -19935,10 +19913,40 @@ async function sb(env, path, init = {}) {
   const text = await response.text();
   return text ? JSON.parse(text) : void 0;
 }
+async function sbOptional(env, path, fallback, init = {}) {
+  try {
+    return await sb(env, path, init);
+  } catch {
+    return fallback;
+  }
+}
 
 // api/_lib/cloud-pos.ts
+var CLOUD_ORDER_LIMIT = 400;
 function hashPassword(password, salt) {
   return scryptSync(password, salt, 64, { N: 32768, r: 8, p: 1, maxmem: 64 * 1024 * 1024 }).toString("hex");
+}
+async function ensurePhotoBucket(env) {
+  const headers = { apikey: env.serviceKey, Authorization: `Bearer ${env.serviceKey}`, "Content-Type": "application/json" };
+  const existing = await fetch(`${env.url}/storage/v1/bucket/product-photos`, { headers });
+  if (existing.ok) return true;
+  const created = await fetch(`${env.url}/storage/v1/bucket`, { method: "POST", headers, body: JSON.stringify({ id: "product-photos", name: "product-photos", public: true }) });
+  return created.ok || created.status === 409;
+}
+async function persistCloudPhoto(env, itemId, photo) {
+  if (!photo?.startsWith("data:image/jpeg;base64,")) return photo;
+  try {
+    if (!await ensurePhotoBucket(env)) return photo;
+    const base643 = photo.slice(photo.indexOf(",") + 1).replace(/\s+/g, "");
+    const bytes = Buffer.from(base643, "base64");
+    if (!bytes.length || bytes.length > 35e4) return photo;
+    const objectPath = `${env.shopId}/${itemId.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 80)}.jpg`;
+    const upload = await fetch(`${env.url}/storage/v1/object/product-photos/${objectPath}`, { method: "POST", headers: { apikey: env.serviceKey, Authorization: `Bearer ${env.serviceKey}`, "Content-Type": "image/jpeg", "x-upsert": "true" }, body: bytes });
+    if (!upload.ok) return photo;
+    return `${env.url}/storage/v1/object/public/product-photos/${objectPath}`;
+  } catch {
+    return photo;
+  }
 }
 async function loadState(env) {
   const metaRows = await sb(env, `pos_meta?id=eq.${encodeURIComponent(env.shopId)}&select=id,payload,revision,updated_at`);
@@ -19949,27 +19957,37 @@ async function loadState(env) {
     meta3 = (await sb(env, `pos_meta?id=eq.${encodeURIComponent(env.shopId)}&select=id,payload,revision,updated_at`))[0];
   }
   const payload = meta3.payload;
-  const orders = await sb(env, "pos_orders?select=id,reference,request_key,payload&order=updated_at.desc");
-  const jobs = await sb(env, "pos_print_jobs?select=id,order_id,kind,state,payload&order=updated_at.asc");
-  const expenseRows = await sb(env, `pos_expenses?shop_id=eq.${encodeURIComponent(env.shopId)}&select=id,shop_id,payload,updated_at&order=updated_at.desc`);
+  const [orders, jobs, expenseRows] = await Promise.all([
+    sb(env, `pos_orders?select=id,reference,request_key,payload&order=updated_at.desc&limit=${CLOUD_ORDER_LIMIT}`),
+    sb(env, `pos_print_jobs?select=id,order_id,kind,state,payload&order=updated_at.desc&limit=800`),
+    sbOptional(env, `pos_expenses?shop_id=eq.${encodeURIComponent(env.shopId)}&select=id,shop_id,payload,updated_at&order=updated_at.desc`, [])
+  ]);
   let expenses = normalizeExpenses(expenseRows.map((row) => row.payload));
   if (!expenses.length) {
     const legacy = normalizeExpenses(payload.expenses);
     if (legacy.length) {
-      await upsertExpenses(env, legacy);
-      expenses = legacy;
+      try {
+        await upsertExpenses(env, legacy);
+        expenses = legacy;
+      } catch {
+        expenses = legacy;
+      }
     }
   }
+  const parsedOrders = orders.map((row) => row.payload).filter(Boolean);
+  const orderIds = new Set(parsedOrders.map((o) => o.id));
+  const parsedJobs = jobs.map((row) => row.payload).filter((j) => j && (orderIds.has(j.orderId) || j.state === "queued" || j.state === "submitting"));
+  const items = Array.isArray(payload.items) ? payload.items : initialState().items;
   const state = {
     version: 1,
     catalogVersion: typeof payload.catalogVersion === "string" ? payload.catalogVersion : initialState().catalogVersion,
-    items: Array.isArray(payload.items) ? payload.items : initialState().items,
+    items,
     categories: Array.isArray(payload.categories) ? payload.categories : initialState().categories,
     settings: payload.settings ? settingsSchema.parse(payload.settings) : initialState().settings,
     sequence: Number.isInteger(payload.sequence) ? Number(payload.sequence) : 1e3,
     expenses,
-    orders: orders.map((row) => row.payload).filter(Boolean),
-    jobs: jobs.map((row) => row.payload).filter(Boolean),
+    orders: parsedOrders,
+    jobs: parsedJobs,
     audit: []
   };
   return state;
@@ -20064,7 +20082,9 @@ async function invokeCloudPos(method, args, session) {
     }
     case "saveItem": {
       const actor = authed();
-      const item = itemSchema.parse(args[0]);
+      const incoming = itemSchema.parse(args[0]);
+      const photo = await persistCloudPhoto(env, incoming.id, incoming.photo);
+      const item = itemSchema.parse(photo && photo !== incoming.photo ? { ...incoming, photo } : incoming);
       const state = await loadState(env);
       saveItem(state, actor, item);
       const metaRows = await sb(env, `pos_meta?id=eq.${encodeURIComponent(env.shopId)}&select=revision`);
@@ -20098,18 +20118,14 @@ async function invokeCloudPos(method, args, session) {
       return { result: void 0, session };
     }
     case "saveExpense": {
-      const actor = authed();
+      requireAdmin(authed());
       const expense = expenseSchema.parse(args[0]);
-      const state = await loadState(env);
-      saveExpense(state, actor, expense);
       await upsertExpenses(env, [expense]);
       return { result: void 0, session };
     }
     case "deleteExpense": {
-      const actor = authed();
-      const id = external_exports.string().parse(args[0]);
-      const state = await loadState(env);
-      deleteExpense(state, actor, id);
+      requireAdmin(authed());
+      const id = external_exports.string().min(1).parse(args[0]);
       await deleteExpenseRow(env, id);
       return { result: void 0, session };
     }

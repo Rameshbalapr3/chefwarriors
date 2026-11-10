@@ -73,7 +73,7 @@ export async function startBrowserServer(options:{root:string;photoRoot?:string;
    if(!file.startsWith(root+sep)){fail(res,403,'Invalid file path');return;}
    const mime:Record<string,string>={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.svg':'image/svg+xml','.webp':'image/webp','.ico':'image/x-icon','.woff2':'font/woff2'};
    if(!mime[extname(file)]){fail(res,404,'Not found');return;}
-   try{const data=await readFile(file);res.writeHead(200,{'Content-Type':mime[extname(file)],'Cache-Control':'no-cache','Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: http://127.0.0.1:* http://localhost:*; connect-src 'self'; frame-src 'self' about:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"});res.end(req.method==='HEAD'?undefined:data);}catch{fail(res,404,'Application files not found. Install the updated POS release.');}
+   try{const data=await readFile(file);res.writeHead(200,{'Content-Type':mime[extname(file)],'Cache-Control':'no-cache','Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: http://127.0.0.1:* http://localhost:* https://*.supabase.co; connect-src 'self' https://*.supabase.co; frame-src 'self' about:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"});res.end(req.method==='HEAD'?undefined:data);}catch{fail(res,404,'Application files not found. Install the updated POS release.');}
   }catch{if(!res.headersSent)fail(res,400,'Unable to process this POS request');else res.end();}
  });
  server.requestTimeout=15000;server.headersTimeout=10000;

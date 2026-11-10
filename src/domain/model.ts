@@ -1,7 +1,8 @@
 import { z } from 'zod';
 const productPhotoPath=/^product-photos\/[a-zA-Z0-9_.-]+\.jpg$/;
 const productPhotoDataUrl=/^data:image\/jpeg;base64,[A-Za-z0-9+/=\s]+$/;
-export const itemSchema=z.object({id:z.string().min(1),name:z.string().trim().min(1).max(100),category:z.string().trim().min(1).max(40),price:z.number().int().min(0).max(10000000),available:z.boolean(),image:z.number().int().min(0).max(15),photo:z.string().max(400000).refine(value=>productPhotoPath.test(value)||productPhotoDataUrl.test(value),'Use a saved product photo or a JPEG upload').optional(),description:z.string().max(800).optional(),options:z.array(z.object({name:z.string().min(1).max(60),values:z.array(z.string().min(1).max(60)).min(1).max(10)})).max(8).optional()});
+const productPhotoHttp=/^https:\/\/\S{8,2000}$/i;
+export const itemSchema=z.object({id:z.string().min(1),name:z.string().trim().min(1).max(100),category:z.string().trim().min(1).max(40),price:z.number().int().min(0).max(10000000),available:z.boolean(),image:z.number().int().min(0).max(15),photo:z.string().max(400000).refine(value=>productPhotoPath.test(value)||productPhotoDataUrl.test(value)||productPhotoHttp.test(value),'Use a saved product photo, JPEG upload, or cloud photo URL').optional(),description:z.string().max(800).optional(),options:z.array(z.object({name:z.string().min(1).max(60),values:z.array(z.string().min(1).max(60)).min(1).max(10)})).max(8).optional()});
 export type Item=z.infer<typeof itemSchema>;
 export const settingsSchema=z.object({shop:z.string().trim().min(1).max(80),address:z.string().max(200),phone:z.string().max(30),taxRate:z.number().min(0).max(100),rounding:z.enum(['paise','rupee']),width:z.enum(['58','80']),counter:z.string().max(200),kitchen:z.string().max(200),sharedPrinter:z.boolean()});
 export type Settings=z.infer<typeof settingsSchema>;

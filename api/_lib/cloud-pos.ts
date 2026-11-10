@@ -3,7 +3,7 @@ import {z} from 'zod';
 import * as engine from '../../src/application/engine';
 import {checkoutSchema,expenseSchema,itemSchema,normalizeExpenses,settingsSchema,type Session,type State} from '../../src/domain/model';
 import {initialState} from '../../src/domain/seed';
-import {readSupabaseEnv,sb,type SupabaseEnv} from './supabase';
+import {readSupabaseEnv,sb,sbOptional,type SupabaseEnv} from './supabase';
 
 type UserRow={username:string;salt:string;hash:string;role:'admin'|'cashier';active:boolean};
 type MetaRow={id:string;payload:unknown;revision:number;updated_at:string};
@@ -11,8 +11,33 @@ type OrderRow={id:string;reference:string;request_key:string;payload:unknown};
 type JobRow={id:string;order_id:string;kind:string;state:string;payload:unknown};
 type ExpenseRow={id:string;shop_id:string;payload:unknown;updated_at:string};
 
+/** Keep cloud state payloads small so billing stays fast as history grows. */
+const CLOUD_ORDER_LIMIT=400;
+
 function hashPassword(password:string,salt:string){
  return scryptSync(password,salt,64,{N:32768,r:8,p:1,maxmem:64*1024*1024}).toString('hex');
+}
+
+async function ensurePhotoBucket(env:SupabaseEnv){
+ const headers={apikey:env.serviceKey,Authorization:`Bearer ${env.serviceKey}`,'Content-Type':'application/json'};
+ const existing=await fetch(`${env.url}/storage/v1/bucket/product-photos`,{headers});
+ if(existing.ok)return true;
+ const created=await fetch(`${env.url}/storage/v1/bucket`,{method:'POST',headers,body:JSON.stringify({id:'product-photos',name:'product-photos',public:true})});
+ return created.ok||created.status===409;
+}
+
+async function persistCloudPhoto(env:SupabaseEnv,itemId:string,photo:string|undefined){
+ if(!photo?.startsWith('data:image/jpeg;base64,'))return photo;
+ try{
+  if(!await ensurePhotoBucket(env))return photo;
+  const base64=photo.slice(photo.indexOf(',')+1).replace(/\s+/g,'');
+  const bytes=Buffer.from(base64,'base64');
+  if(!bytes.length||bytes.length>350000)return photo;
+  const objectPath=`${env.shopId}/${itemId.replace(/[^a-zA-Z0-9_-]/g,'_').slice(0,80)}.jpg`;
+  const upload=await fetch(`${env.url}/storage/v1/object/product-photos/${objectPath}`,{method:'POST',headers:{apikey:env.serviceKey,Authorization:`Bearer ${env.serviceKey}`,'Content-Type':'image/jpeg','x-upsert':'true'},body:bytes});
+  if(!upload.ok)return photo;
+  return `${env.url}/storage/v1/object/public/product-photos/${objectPath}`;
+ }catch{return photo;}
 }
 
 async function loadState(env:SupabaseEnv):Promise<State>{
@@ -24,28 +49,33 @@ async function loadState(env:SupabaseEnv):Promise<State>{
   meta=(await sb<MetaRow[]>(env,`pos_meta?id=eq.${encodeURIComponent(env.shopId)}&select=id,payload,revision,updated_at`))[0];
  }
  const payload=meta.payload as Partial<State>;
- const orders=await sb<OrderRow[]>(env,'pos_orders?select=id,reference,request_key,payload&order=updated_at.desc');
- const jobs=await sb<JobRow[]>(env,'pos_print_jobs?select=id,order_id,kind,state,payload&order=updated_at.asc');
- const expenseRows=await sb<ExpenseRow[]>(env,`pos_expenses?shop_id=eq.${encodeURIComponent(env.shopId)}&select=id,shop_id,payload,updated_at&order=updated_at.desc`);
+ const [orders,jobs,expenseRows]=await Promise.all([
+  sb<OrderRow[]>(env,`pos_orders?select=id,reference,request_key,payload&order=updated_at.desc&limit=${CLOUD_ORDER_LIMIT}`),
+  sb<JobRow[]>(env,`pos_print_jobs?select=id,order_id,kind,state,payload&order=updated_at.desc&limit=800`),
+  sbOptional<ExpenseRow[]>(env,`pos_expenses?shop_id=eq.${encodeURIComponent(env.shopId)}&select=id,shop_id,payload,updated_at&order=updated_at.desc`,[])
+ ]);
  let expenses=normalizeExpenses(expenseRows.map(row=>row.payload));
  // One-time move of legacy expenses that lived inside pos_meta.payload.
  if(!expenses.length){
   const legacy=normalizeExpenses(payload.expenses);
   if(legacy.length){
-   await upsertExpenses(env,legacy);
-   expenses=legacy;
+   try{await upsertExpenses(env,legacy);expenses=legacy;}catch{expenses=legacy;}
   }
  }
+ const parsedOrders=orders.map(row=>row.payload as State['orders'][number]).filter(Boolean);
+ const orderIds=new Set(parsedOrders.map(o=>o.id));
+ const parsedJobs=jobs.map(row=>row.payload as State['jobs'][number]).filter(j=>j&&(orderIds.has(j.orderId)||j.state==='queued'||j.state==='submitting'));
+ const items=Array.isArray(payload.items)?payload.items as State['items']:initialState().items;
  const state:State={
   version:1,
   catalogVersion:typeof payload.catalogVersion==='string'?payload.catalogVersion:initialState().catalogVersion,
-  items:Array.isArray(payload.items)?payload.items as State['items']:initialState().items,
+  items,
   categories:Array.isArray(payload.categories)?payload.categories as string[]:initialState().categories,
   settings:payload.settings?settingsSchema.parse(payload.settings):initialState().settings,
   sequence:Number.isInteger(payload.sequence)?Number(payload.sequence):1000,
   expenses,
-  orders:orders.map(row=>row.payload as State['orders'][number]).filter(Boolean),
-  jobs:jobs.map(row=>row.payload as State['jobs'][number]).filter(Boolean),
+  orders:parsedOrders,
+  jobs:parsedJobs,
   audit:[]
  };
  return state;
@@ -147,7 +177,9 @@ export async function invokeCloudPos(method:string,args:unknown[],session:Sessio
   }
   case 'saveItem':{
    const actor=authed();
-   const item=itemSchema.parse(args[0]);
+   const incoming=itemSchema.parse(args[0]);
+   const photo=await persistCloudPhoto(env,incoming.id,incoming.photo);
+   const item=itemSchema.parse(photo&&photo!==incoming.photo?{...incoming,photo}:incoming);
    const state=await loadState(env);
    engine.saveItem(state,actor,item);
    const metaRows=await sb<MetaRow[]>(env,`pos_meta?id=eq.${encodeURIComponent(env.shopId)}&select=revision`);
@@ -179,18 +211,15 @@ export async function invokeCloudPos(method:string,args:unknown[],session:Sessio
    return {result:undefined,session};
   }
   case 'saveExpense':{
-   const actor=authed();
+   // Fast path: do not reload full POS state for a single expense write.
+   engine.requireAdmin(authed());
    const expense=expenseSchema.parse(args[0]);
-   const state=await loadState(env);
-   engine.saveExpense(state,actor,expense);
    await upsertExpenses(env,[expense]);
    return {result:undefined,session};
   }
   case 'deleteExpense':{
-   const actor=authed();
-   const id=z.string().parse(args[0]);
-   const state=await loadState(env);
-   engine.deleteExpense(state,actor,id);
+   engine.requireAdmin(authed());
+   const id=z.string().min(1).parse(args[0]);
    await deleteExpenseRow(env,id);
    return {result:undefined,session};
   }

@@ -24,3 +24,8 @@ export async function sb<T>(env:SupabaseEnv,path:string,init:RequestInit={}):Pro
  const text=await response.text();
  return text?JSON.parse(text) as T:undefined as T;
 }
+
+/** Soft read for optional tables — missing/failed tables must not stall the POS. */
+export async function sbOptional<T>(env:SupabaseEnv,path:string,fallback:T,init:RequestInit={}):Promise<T>{
+ try{return await sb<T>(env,path,init);}catch{return fallback;}
+}
