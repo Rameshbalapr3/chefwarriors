@@ -1,9 +1,12 @@
 /* Use physical control sizes on compact counters and fluid type on large displays. */
 .mobile-billing-tabs{display:none}
-.billing-overview{position:relative;flex:none;min-width:0;margin-top:10px}
-.billing-overview>summary{display:none}
-.billing-overview .billing-dashboard{height:152px;margin-top:0}
+.billing-overview{position:relative;flex:none;min-width:0;margin-top:8px;z-index:6}
+.billing-overview>summary{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:40px;padding:8px 12px;background:#102330;border:1px solid #29404f;border-radius:8px;cursor:pointer;font-size:12px;list-style:none}
+.billing-overview>summary::-webkit-details-marker{display:none}
+.billing-overview>summary span{color:var(--yellow)}
+.billing-overview .billing-dashboard{margin-top:0}
 .billing-overview:not([open])>.billing-dashboard{display:none}
+.billing-overview[open]>.billing-dashboard{position:absolute;bottom:calc(100% + 6px);left:0;right:0;height:auto;max-height:min(52dvh,420px);overflow:auto;padding:10px;border:1px solid #395769;border-radius:10px;background:#0a1c28;z-index:8;box-shadow:0 -8px 32px #0007;gap:12px}
 @media(min-width:801px){
  .billing-shell{--counter-font:clamp(14px,min(.95vw,2.2dvh),24px);--rail:clamp(180px,12vw,300px);--bar:clamp(68px,7.5dvh,112px);font-size:var(--counter-font)}
  .billing-shell .topbar{height:var(--bar);min-height:var(--bar);gap:1em;padding:.5em 1em}
@@ -22,15 +25,29 @@
  .billing-shell .sidebar nav button,.billing-shell.nav-expanded .sidebar nav button{font-size:.95em;min-height:48px;padding:.65em}
  .billing-shell .sidebar .nav-toggle{min-width:44px;min-height:44px;height:44px;width:44px;margin-bottom:4px}
  .billing-shell .sidebar .modebar button{min-height:44px}
- .billing-shell .billing-layout{grid-template-columns:minmax(0,1fr) clamp(350px,35vw,880px);gap:clamp(8px,1vw,24px)}
- .billing-shell .section-heading h1{font-size:1.15em}
- .billing-shell .section-heading>.muted{font-size:.85em}
- .billing-shell .billing-categories{gap:6px;max-height:144px;overflow-y:auto;overscroll-behavior:contain}
- .billing-shell .billing-categories button{font-size:.9em;min-height:44px;padding:.5em .7em}
- .billing-shell .billing-products{grid-template-columns:repeat(auto-fill,minmax(min(100%,clamp(145px,10.5vw,270px)),1fr));gap:.65em}
- .billing-shell .menu-product h3{font-size:1em;min-height:2.6em;line-height:1.3}
- .billing-shell .product-bottom strong{font-size:1.12em}
- .billing-shell .billing-products .add{min-height:44px;font-size:.9em}
+ /* Image-1 style: wide menu + clear cart rail; denser food tiles */
+ .billing-shell .billing-layout{grid-template-columns:minmax(0,1fr) clamp(340px,32vw,460px);gap:clamp(8px,1vw,16px)}
+ .billing-shell .section-heading{margin:0 0 6px;min-height:0}
+ .billing-shell .section-heading small{display:none}
+ .billing-shell .section-heading h1{font-size:1.05em;margin:0}
+ .billing-shell .section-heading>.muted{font-size:.8em}
+ .billing-shell .billing-categories{gap:6px;max-height:none;overflow-x:auto;overflow-y:hidden;flex-wrap:nowrap;overscroll-behavior:contain;margin:0 0 8px;padding-bottom:2px}
+ .billing-shell .billing-categories button{font-size:.85em;min-height:44px;padding:.45em .75em;border-radius:999px;flex:0 0 auto;white-space:nowrap}
+ .billing-shell .billing-products{grid-template-columns:repeat(auto-fill,minmax(min(100%,clamp(112px,9vw,158px)),1fr));gap:8px}
+ .billing-shell .menu-product{position:relative;padding:0;gap:0;overflow:hidden;display:flex;flex-direction:column;min-height:0;border-radius:10px}
+ .billing-shell .menu-product-top{display:block;position:relative;width:100%}
+ .billing-shell .menu-product-category{display:none}
+ .billing-shell .billing-products .food-photo{width:100%;height:auto;aspect-ratio:1.08;border-radius:0;background-color:#102330}
+ .billing-shell .billing-products .food-photo svg{width:28px;height:28px}
+ .billing-shell .billing-products .custom-food-photo img{width:100%;height:100%;object-fit:cover;display:block}
+ .billing-shell .product-info{padding:6px 8px 8px;gap:6px;flex:1;display:flex;flex-direction:column}
+ .billing-shell .menu-product h3{font-size:max(14px,.92em);min-height:2.5em;line-height:1.25;text-align:center;margin:0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+ .billing-shell .billing-products .product-description{display:none}
+ .billing-shell .product-bottom{display:flex;flex-direction:column;align-items:stretch;gap:0;margin-top:auto;padding-top:0;position:static}
+ /* Price badge on photo (reference layout), keep Add full-width under name */
+ .billing-shell .product-bottom strong{position:absolute;top:7px;left:7px;z-index:2;font-size:11px;line-height:1.2;padding:3px 7px;border-radius:6px;background:linear-gradient(110deg,#ffda73,#ffca4e);color:#12232b;box-shadow:0 1px 4px #0007;pointer-events:none}
+ .billing-shell .billing-products .add{width:100%;min-height:36px;justify-content:center;font-size:.8em;padding:4px 8px;border-radius:8px}
+ .billing-shell .order-panel{border:1px solid #365262;box-shadow:0 0 0 1px #0a1620 inset,0 10px 28px #0005;background:linear-gradient(165deg,#0e2231,#0a1a26)}
  .billing-shell .order-heading h2{font-size:1.2em}
  .billing-shell .order-heading{padding:.55em .7em}
  .billing-shell .order-heading h2 span,.billing-shell .text-button{font-size:.85em}
@@ -46,21 +63,20 @@
  .billing-shell .cart-item-bottom .stepper b{min-width:20px;font-size:.95em}
  .billing-shell .cart-item-top button{min-width:44px;min-height:44px}
  .billing-shell .cart-item-bottom>small{font-size:.8em}
- .billing-shell .cart-item-bottom>strong{font-size:.95em}
+ .billing-shell .cart-item-bottom>strong{font-size:.95em;position:static;padding:0;background:none;box-shadow:none;color:inherit}
  .billing-shell .cart-note,.billing-shell .cart-choices{font-size:.8em}
  .billing-shell .cart-note summary{min-height:32px;align-content:center}
  .billing-shell .cart-empty h3{font-size:1em}
- .billing-shell .checkout-actions{padding:.5em .7em .7em}
+ .billing-shell .checkout-actions{padding:.5em .7em .7em;border-top:1px solid #365262;background:#0b1b28}
  .billing-shell .order-adjustments,.billing-shell .adjustment-rows .total-row,.billing-shell .total-row label{font-size:.9em}
  .billing-shell .order-adjustments summary{min-height:36px}
  .billing-shell .grand-total{font-size:1.15em;padding:.5em 0}
- .billing-shell .grand-total strong{font-size:1.5em}
+ .billing-shell .grand-total strong{font-size:1.55em}
  .billing-shell .payment-label{font-size:.95em;margin:.5em 0}
  .billing-shell .payments button{font-size:.95em;min-height:48px;padding:.5em}
  .billing-shell .checkout-button{font-size:1.1em;min-height:48px;margin-top:.6em}
  .billing-shell .billing-print-status{font-size:.8em}
  .billing-shell .print-status-title button{min-height:44px;font-size:1em}
- .billing-overview .billing-dashboard{height:clamp(145px,16dvh,235px);gap:1em}
  .billing-dashboard .dashboard-panel{padding:.7em}
  .billing-dashboard h2{font-size:1em;line-height:1.3}
  .billing-dashboard small,.billing-dashboard th,.billing-dashboard td{font-size:.8em}
@@ -100,11 +116,6 @@
  .billing-shell .payment-label{margin:3px 0}
  .billing-shell .billing-categories{max-height:96px}
 }
-@media(max-height:739px),(max-width:800px){
- .billing-overview>summary{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:44px;padding:8px 12px;background:#102330;border:1px solid #29404f;border-radius:8px;cursor:pointer;font-size:12px}
- .billing-overview>summary span{color:var(--yellow)}
- .billing-overview[open]>.billing-dashboard{position:absolute;bottom:50px;left:0;right:0;height:auto;max-height:55dvh;overflow:auto;padding:8px;border:1px solid #395769;border-radius:10px;background:#0a1c28;z-index:8;box-shadow:0 -8px 32px #0007}
-}
 @media(max-width:800px){
  .billing-shell{position:fixed;inset:0;height:100dvh;display:flex;flex-direction:column;overflow:hidden}
  .billing-shell .topbar{height:auto;min-height:0;flex-shrink:0;padding:8px 10px;gap:6px;flex-wrap:wrap}
@@ -135,14 +146,16 @@
  .billing-shell .billing-categories{flex-shrink:0;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;max-height:none;margin-bottom:8px}
  .billing-shell .billing-categories button{min-height:44px;font-size:13px;white-space:nowrap}
  .billing-shell .menu-products-scroll{flex:1;min-height:0;max-height:none;overflow:auto}
- .billing-shell .billing-products{grid-template-columns:repeat(auto-fill,minmax(min(100%,145px),1fr));gap:8px}
- .billing-shell .menu-product{padding:6px;gap:7px;min-height:0}
+ .billing-shell .billing-products{grid-template-columns:repeat(auto-fill,minmax(min(100%,132px),1fr));gap:8px}
+ .billing-shell .menu-product{padding:0;gap:0;min-height:0;position:relative;overflow:hidden}
  .billing-shell .menu-product-top{display:block}
  .billing-shell .menu-product-category{display:none}
- .billing-shell .billing-products .food-photo{width:100%;height:auto;aspect-ratio:1.5}
- .billing-shell .menu-product h3{font-size:14px;line-height:1.3}
- .billing-shell .product-bottom{flex-wrap:wrap;gap:6px}
- .billing-shell .billing-products .add{min-height:44px;justify-content:center;flex:1;font-size:13px}
+ .billing-shell .billing-products .food-photo{width:100%;height:auto;aspect-ratio:1.08;border-radius:0}
+ .billing-shell .product-info{padding:6px 8px 8px}
+ .billing-shell .menu-product h3{font-size:14px;line-height:1.3;text-align:center;min-height:2.4em}
+ .billing-shell .product-bottom{flex-wrap:nowrap;gap:0;flex-direction:column}
+ .billing-shell .product-bottom strong{position:absolute;top:7px;left:7px;z-index:2;font-size:11px;padding:3px 7px;border-radius:6px;background:linear-gradient(110deg,#ffda73,#ffca4e);color:#12232b;box-shadow:0 1px 4px #0007}
+ .billing-shell .billing-products .add{min-height:44px;justify-content:center;width:100%;font-size:13px}
  .billing-shell .product-description{display:none}
  .billing-shell .billing-print-status{padding:4px 8px;margin-top:6px;font-size:10px}
  .billing-shell .billing-print-status>small{display:none}
@@ -164,6 +177,19 @@
  .billing-shell .checkout-button{margin-top:6px}
  .billing-shell .billing-overview{margin-top:6px}
  .billing-shell .banner{flex:none;max-height:80px;overflow:auto}
+}
+/* Keep dense image cards on large counters (overrides older 4-col / tiny-thumb rules). */
+@media(min-width:1600px){
+ .billing-shell .billing-products{grid-template-columns:repeat(auto-fill,minmax(min(100%,clamp(124px,8vw,168px)),1fr));gap:10px}
+ .billing-shell .billing-products .food-photo{width:100%;height:auto;aspect-ratio:1.08;border-radius:0}
+ .billing-shell .menu-product{padding:0;min-height:0}
+ .billing-shell .product-bottom strong{font-size:12px}
+ .billing-shell .billing-layout{grid-template-columns:minmax(0,1fr) clamp(380px,28vw,480px)}
+}
+@media(min-width:3000px){
+ .billing-shell .billing-products{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+}
+@media(max-width:800px){
  .print-preview-content{display:flex;flex-direction:column}
  .print-preview-content .document-tabs{max-width:none;flex:none}
  .print-order-summary{justify-content:flex-start;font-size:11px;gap:8px}

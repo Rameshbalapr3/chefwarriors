@@ -8,9 +8,10 @@ test('dashboard uses saved sales and recent-order navigation',async({page})=>{
  await page.setViewportSize({width:1366,height:768});
  await page.addInitScript(state=>{window.pos={mode:'browser',authStatus:async()=>({ok:true,data:{setup:false,session:{username:'Test',role:'admin'}}}),state:async()=>({ok:true,data:state})} as typeof window.pos;},state);
  await page.goto('/');
+ await page.getByText("Today's overview",{exact:false}).click();
  const summary=page.locator('.dashboard-stats');
  await expect(summary.locator('strong')).toHaveText(['₹60','1','₹60']);
  await expect(page.getByText('Frequently sold',{exact:true})).toHaveCount(0);
  await page.getByRole('button',{name:'View all',exact:true}).click();
- await expect(page.getByRole('heading',{name:'Order history',exact:true})).toBeVisible();
+ await expect(page.getByRole('heading',{name:'Orders',exact:true})).toBeVisible();
 });

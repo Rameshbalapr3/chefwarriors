@@ -144,11 +144,7 @@
   /* Menu page: pin search + category nav; only the product table scrolls. */
   .shell:not(.billing-shell) .workspace:has(.menu-management){overflow:hidden}
   .shell:not(.billing-shell) .menu-management{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden;padding-bottom:0}
-  .shell:not(.billing-shell) .menu-management .page-title,
-  .shell:not(.billing-shell) .menu-management-toolbar,
-  .shell:not(.billing-shell) .menu-management .management-categories,
-  .shell:not(.billing-shell) .menu-management .management-filter-row,
-  .shell:not(.billing-shell) .menu-management .management-help{flex-shrink:0}
+  .shell:not(.billing-shell) .menu-management .menu-hero{flex-shrink:0}
   .shell:not(.billing-shell) .menu-management .management-table{flex:1;min-height:0;max-height:none;overflow:auto}
   .shell:not(.billing-shell) .workspace:has(.menu-management) .workspace-footer{flex-shrink:0}
 }
@@ -408,26 +404,23 @@
 }
 /* Menu administration: readable rows and direct touch controls. */
 .menu-management{--management-font:clamp(14px,.9vw,28px);font-size:var(--management-font);padding-bottom:1em}
-.menu-management .page-title{margin:.75em 0 1.2em;align-items:center;flex-wrap:wrap}
-.menu-management .page-title h1{font-size:1.8em}
-.menu-management .page-title p{font-size:.95em}
-.menu-management .row-actions{display:flex;flex-wrap:wrap;gap:.6em}
 .menu-management button,.menu-management input,.menu-management select{font-size:1em;min-height:44px;padding:.65em .9em}
-.menu-management-toolbar{display:flex;align-items:end;flex-wrap:wrap;gap:1em;margin-bottom:1em}
-.menu-management-toolbar label{margin:0;min-width:0;font-size:.85em;gap:.45em}
-.menu-management-toolbar input,.menu-management-toolbar select{font-size:1.15em}
-.management-search{flex:1 1 16em}
-.menu-management-toolbar>label:last-child{flex:0 1 16em}
-.menu-management .management-categories{flex-wrap:wrap;max-height:12em;overflow-y:auto;overflow-x:hidden;gap:.45em;padding:0 .2em .5em 0;margin-bottom:.65em}
-.menu-management .management-categories button{flex:0 0 auto;min-width:0;font-size:.85em;white-space:normal}
-.management-filter-row{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.8em;margin-bottom:1em}
-.availability-filters{display:flex;flex-wrap:wrap;gap:.45em}
-.availability-filters button{font-size:.85em}
-.availability-filters button span{padding:.1em .45em;border-radius:1em;background:#ffffff12;font-size:.85em}
-.availability-filters button.selected span{background:#00000016}
-.management-filter-row>.muted,.management-help{font-size:.85em}
-.management-help{margin:0 0 1em;color:var(--muted)}
-.management-table{max-height:65dvh;overflow:auto;scrollbar-width:thin;overscroll-behavior:contain}
+.menu-hero{display:grid;gap:.65em;margin:.2em 0 .75em}
+.menu-hero-top{display:flex;flex-wrap:wrap;align-items:center;gap:.55em .75em}
+.menu-hero h1{margin:0;font-size:1.65em}
+.menu-count-pill{padding:.45em .85em;border-radius:999px;background:#ffdc0018;border:1px solid #8b7723;color:var(--yellow);font-weight:700}
+.menu-hero-actions{display:flex;flex-wrap:wrap;gap:.45em;margin-left:auto}
+.menu-hero-actions button{min-height:44px;font-weight:650;background:#201d16;border-color:#3c3423;color:#f5efd8}
+.menu-hero-actions button:hover:not(:disabled){background:#3a3424;border-color:#c4a832;color:#fffdf0}
+.menu-hero-actions .primary{color:#201b07!important}
+.menu-hint{margin:0;color:var(--muted);font-size:.82em}
+.menu-filters{display:flex;flex-wrap:wrap;gap:.45em}
+.menu-filters button{min-height:40px;padding:.4em .85em;font-size:.88em;border-radius:999px;background:#201d16!important;border-color:#3c3423!important;color:#f5efd8!important}
+.menu-filters button:hover:not(:disabled){background:#3a3424!important;border-color:#c4a832!important;color:#fffdf0!important}
+.menu-filters button.active{background:#ffdc00!important;border-color:#ffdc00!important;color:#201b07!important;font-weight:700}
+.menu-management .management-categories{flex-wrap:wrap;max-height:9em;overflow-y:auto;overflow-x:hidden;gap:.4em;padding:0;margin:0}
+.menu-management .management-categories button{flex:0 0 auto;min-width:0;min-height:38px;font-size:.82em;white-space:normal;padding:.4em .7em}
+.management-table{max-height:68dvh;overflow:auto;scrollbar-width:thin;overscroll-behavior:contain}
 .management-table table{font-size:1em;width:100%}
 .management-table th{position:sticky;top:0;z-index:2;background:#252117;color:#c2b99f;font-size:.8em}
 .management-table td,.management-table th{padding:.85em 1em}
@@ -447,30 +440,37 @@
 .availability-switch::after{content:'';width:.9em;height:.9em;border-radius:50%;background:#fff;transition:transform .15s}
 .is-available .availability-switch{background:#287e58}
 .is-available .availability-switch::after{transform:translateX(.9em)}
-.product-editor-fields{border:0;padding:0;margin:0;min-width:0}
-.editor-options{margin:1em 0;padding:1em;border:1px solid var(--border);border-radius:10px}
-.editor-options>h3{margin-bottom:.5em}
-.editor-options>p{font-size:12px;line-height:1.5}
-.editor-option{padding:1em 0;border-bottom:1px solid var(--border);margin-bottom:1em}
-.editor-option textarea{min-height:90px}
-.product-editor-fields>.checkbox{margin-top:1em}
+.product-editor-dialog{width:min(92vw,34rem)}
+.product-editor{margin:0}
+.product-editor-fields{border:0;padding:0;margin:0;min-width:0;display:grid;gap:.85em}
+.editor-main{display:grid;grid-template-columns:1fr 1fr;gap:.7em .75em}
+.editor-main .editor-span,.editor-main>label:first-child{grid-column:1/-1}
+.editor-main label{margin:0}
+.editor-photo{display:flex;align-items:center;gap:.85em;padding:.75em;border:1px solid var(--border);border-radius:12px;background:#17150f}
+.editor-photo-actions{display:grid;gap:.45em;min-width:0;flex:1}
+.editor-choices{display:grid;gap:.55em;padding:.75em;border:1px solid var(--border);border-radius:12px;background:#17150f}
+.editor-choices-toggle{justify-content:flex-start;min-height:42px;background:#201d16;border-color:#3c3423;color:#f5efd8;font-weight:650}
+.editor-choices-toggle:hover:not(:disabled){background:#3a3424;border-color:#c4a832;color:#fffdf0}
+.editor-note{margin:0;color:var(--muted);font-size:.82em}
+.editor-option{display:grid;gap:.55em;padding:.65em 0;border-bottom:1px solid #2c281c}
+.editor-option textarea{min-height:72px}
+.editor-option button{justify-self:start}
+.editor-actions{display:grid;grid-template-columns:1fr 1.4fr;gap:.55em}
+.editor-actions button{min-height:48px;font-weight:700}
+.product-editor-fields>.checkbox{margin:0}
 @media(max-width:800px){
-  .menu-management .page-title{align-items:stretch}
-  .menu-management .page-title>div:last-child{display:flex;flex-wrap:wrap;gap:.5em}
-  .menu-management-toolbar>label:last-child{flex:1 1 12em}
+  .menu-hero-actions{margin-left:0;width:100%}
   .menu-management .management-categories{flex-wrap:nowrap;max-height:none;overflow-x:auto;overflow-y:hidden}
   .menu-management .management-categories button{white-space:nowrap}
-  .management-table{max-height:65dvh}
   .management-table td,.management-table th{padding:.75em}
   .management-table td:first-child{min-width:13em}
 }
-.editor-image-preview{width:80px;height:80px;aspect-ratio:1;border-radius:10px;margin-bottom:4px}
+.editor-image-preview{width:72px;height:72px;aspect-ratio:1;border-radius:10px;flex-shrink:0;margin:0}
 .custom-food-photo{padding:0;overflow:hidden;background:#101f2b!important;background-image:none!important}
 .custom-food-photo>img{display:block;width:100%;height:100%;object-fit:cover}
-.editor-image-block{display:flex;flex-direction:column;gap:10px;margin:0 0 16px;padding:12px;border:1px solid #403c2e;border-radius:10px;background:#16140f}
-.editor-upload-row{display:flex;flex-wrap:wrap;gap:8px;align-items:end}
-.editor-upload-label{flex:1 1 14em;margin:0}
+.editor-upload-label{margin:0}
 .editor-upload-label input[type=file]{padding:8px;min-height:44px;background:#1b1b16;border:1px solid #f2c354;border-radius:8px;color:#eaf0f4}
+@media(max-width:600px){.editor-main,.editor-actions{grid-template-columns:1fr}.editor-photo{align-items:stretch;flex-direction:column}}
 
 /* Order history: filters, totals and print recovery remain easy to scan. */
 .orders-pos{font-size:clamp(15px,.95vw,28px);min-width:0;padding-bottom:1em}

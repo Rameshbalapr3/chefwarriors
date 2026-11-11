@@ -1,10 +1,10 @@
 import {ReceiptText,ChartNoAxesCombined} from 'lucide-react';
-import {useEffect,useState} from 'react';
+import {useState} from 'react';
 import {money,localDate,type State} from '../domain/model';
 
 export function BillingDashboard({state,navigate}:{state:State;navigate:(page:string)=>void}){
- const [expanded,setExpanded]=useState(()=>window.matchMedia('(min-width:801px) and (min-height:740px)').matches);
- useEffect(()=>{const media=window.matchMedia('(min-width:801px) and (min-height:740px)');const update=()=>setExpanded(media.matches);media.addEventListener('change',update);return()=>media.removeEventListener('change',update);},[]);
+ /* Keep overview collapsed so product grid + cart stay fully visible (reference POS layout). */
+ const [expanded,setExpanded]=useState(false);
  const today=localDate(new Date().toISOString());
  const paid=state.orders.filter(o=>o.state==='paid'&&localDate(o.created)===today);
  const sales=paid.reduce((sum,o)=>sum+o.totals.total,0);
