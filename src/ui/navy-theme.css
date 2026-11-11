@@ -30,6 +30,11 @@
 .shell .categories button{background:#112532;border-color:#233a49}
 .shell .danger{color:#ff6986}
 .shell .modebar{color:#98b0be}
+.shell .modebar .app-version{margin:0;color:#ffd15c;font-weight:700;letter-spacing:.04em;font-size:12px;line-height:1.2;text-align:center}
+@media(min-width:801px){
+ .shell .sidebar .modebar .app-version{display:block!important}
+ .shell.nav-expanded .sidebar .modebar .app-version{text-align:left;font-size:12px}
+}
 .shell .avatar{background:#203441}
 .shell .muted{color:#91a5b4}
 .shell .order-heading h2 span{background:#ffd15c1a;color:#ffd15c}
