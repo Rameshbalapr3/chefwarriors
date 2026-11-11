@@ -8,7 +8,7 @@ import type {Result} from '../src/contracts/services';
 import {Store} from './database/store';
 import {dispatch} from './printing/printer';
 import * as engine from '../src/application/engine';
-import {checkoutSchema,expenseSchema,itemSchema,settingsSchema,type Session,type Job} from '../src/domain/model';
+import {amendOrderSchema,checkoutSchema,expenseSchema,itemSchema,settingsSchema,type Session,type Job} from '../src/domain/model';
 import {loadSyncEnv,readSupabaseSyncConfig} from './sync/config';
 import {createCloudSync,createNoopCloudSync,type CloudSync} from './sync/engine';
 if(!app.isPackaged&&process.env.POS_TEST_DATA)app.setPath('userData',process.env.POS_TEST_DATA);
@@ -40,6 +40,7 @@ function register(){const handlers:Record<string,(...args:any[])=>unknown>={
  saveExpense:raw=>store.transaction(s=>engine.saveExpense(s,auth(),expenseSchema.parse(raw))),
  deleteExpense:id=>store.transaction(s=>engine.deleteExpense(s,auth(),text.parse(id))),
  cancel:(id,reason)=>store.transaction(s=>engine.cancel(s,auth(),text.parse(id),text.parse(reason))),
+ amendOrder:async raw=>{const actor=auth(),input=amendOrderSchema.parse(raw);const order=store.transaction(s=>engine.amendOrder(s,actor,input,false));const jobs=store.read().jobs.filter(j=>j.orderId===order.id&&j.state==='queued').slice(-2);const printing=(async()=>{for(const job of jobs){try{await printJob(job.id);}catch{/* keep remaining jobs */}}})();pendingPrints.add(printing);void printing.finally(()=>pendingPrints.delete(printing));return order;},
  printers:async()=>{admin();return (await win.webContents.getPrintersAsync()).map(p=>p.name);},
  print:(id,reason)=>printJob(text.parse(id),z.string().max(300).optional().parse(reason)),
  testPrinter:async raw=>{const actor=auth();engine.requireAdmin(actor);const kind=z.enum(['counter','kitchen']).parse(raw),s=store.read();const order={id:'test',reference:'TEST PRINT — NOT AN ORDER',key:'test-print',created:new Date().toISOString(),state:'paid' as const,type:'Takeaway' as const,token:'TEST ONLY',payment:'Cash' as const,tendered:0,change:0,lines:[{...s.items[0],name:'TEST ONLY — do not prepare',qty:1,price:0,notes:'Printer alignment and wrapping check'}],totals:{subtotal:0,discount:0,tax:0,rounding:0,total:0},settings:s.settings};const result=await dispatch(order,{id:'test',orderId:'test',kind,printer:s.settings[kind],copy:false,reason:'Labelled printer test',state:'queued',attempts:[]});store.transaction(s=>engine.audit(s,actor,'printer-test',kind,result.detail));if(result.state!=='submitted')throw Error(result.detail);return result.detail;},

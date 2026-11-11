@@ -1,7 +1,7 @@
-import type {State,Session,Checkout,Order,Item,Settings,Job,Expense} from '../domain/model';
+import type {AmendOrder,State,Session,Checkout,Order,Item,Settings,Job,Expense} from '../domain/model';
 export type Result<T>={ok:true;data:T}|{ok:false;kind:'validation'|'operational'|'unauthorized';error:string};
 export interface MenuRepository {saveItem(item:Item):Promise<Result<void>>;saveCategory(name:string,previous?:string):Promise<Result<void>>}
-export interface BillingService {checkout(input:Checkout):Promise<Result<Order>>;cancel(id:string,reason:string):Promise<Result<void>>}
+export interface BillingService {checkout(input:Checkout):Promise<Result<Order>>;cancel(id:string,reason:string):Promise<Result<void>>;amendOrder(input:AmendOrder):Promise<Result<Order>>}
 export interface ReportService {state():Promise<Result<State>>}
 export interface SettingsRepository {saveSettings(settings:Settings):Promise<Result<void>>;saveExpense(expense:Expense):Promise<Result<void>>;deleteExpense(id:string):Promise<Result<void>>}
 export interface PrinterService {printers():Promise<Result<string[]>>;print(jobId:string,reason?:string):Promise<Result<Job>>;testPrinter(kind:'counter'|'kitchen'):Promise<Result<string>>}

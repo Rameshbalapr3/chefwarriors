@@ -1,8 +1,8 @@
 import {describe,it,expect} from 'vitest';
-import {calculate,kitchenTicket,csvCell,report,localDate,localMonth,nextDailyToken,dailyTokenTaken,tokenHistoryByDay,monthlyOrderTotals,monthlyPnL,servedContents,cashierBusinessDayBounds,inCashierBusinessDay} from '../src/domain/model';
+import {calculate,kitchenTicket,csvCell,report,localDate,localMonth,nextDailyToken,dailyTokenTaken,tokenHistoryByDay,monthlyOrderTotals,monthlyPnL,dailyPnL,servedContents,cashierBusinessDayBounds,inCashierBusinessDay} from '../src/domain/model';
 import {initialState} from '../src/domain/seed';
-import {checkout,cancel,saveItem,saveSettings,saveExpense,deleteExpense,preparePrint} from '../src/application/engine';
-import {receiptHtml} from '../src/domain/receipt';
+import {checkout,cancel,amendOrder,saveItem,saveSettings,saveExpense,deleteExpense,preparePrint} from '../src/application/engine';
+import {expenseBillHtml,receiptHtml} from '../src/domain/receipt';
 const admin={username:'admin',role:'admin' as const},cashier={username:'cashier',role:'cashier' as const};
 const input=()=>({key:crypto.randomUUID(),lines:[{id:'cw-fried-chicken-wings-1-pc',qty:2,notes:'No onions'}],discount:0,type:'Takeaway' as const,token:'01',payment:'Cash' as const,tendered:30000});
 describe('billing rules',()=>{
@@ -14,6 +14,30 @@ describe('billing rules',()=>{
  it('keeps historical price and shop snapshots',()=>{const s=initialState(),o=checkout(s,admin,input(),true);saveItem(s,admin,{...s.items[0],price:90000});saveSettings(s,admin,{...s.settings,shop:'New name'});expect(o.lines[0].price).toBe(6000);expect(o.settings.shop).toBe('The Chef Warriors');});
  it('produces price-free kitchen payload and escapes receipt content',()=>{const s=initialState();s.items[0].name='<script>Bad</script>';const o=checkout(s,admin,input(),true),kot=JSON.stringify(kitchenTicket(o));for(const word of ['price','tax','total','discount','payment','tendered'])expect(kot).not.toContain(word);const html=receiptHtml(o,'kitchen');expect(html).not.toContain('<script>');expect(html).not.toContain('₹');expect(html).toContain(o.reference);expect(html).toContain('No onions');});
  it('prints a customer bill with shop header, order number and no zero clutter',()=>{const s=initialState();const o=checkout(s,admin,input(),true);const html=receiptHtml(o,'counter');expect(html).toContain('THE CHEF WARRIORS');expect(html).toContain(`ORDER NO : ${o.reference}`);expect(html).toContain('>ITEM<');expect(html).toContain('>QTY<');expect(html).toContain('class="qty">2<');expect(html).toContain('SUBTOTAL');expect(html).toContain('TOTAL');expect(html).toContain('Thank you. Visit us again!');expect(html).not.toContain('Discount');expect(html).not.toContain('Tax (');expect(html).not.toContain('Cash recorded');expect(html).not.toContain('<script>');});
+ it('prints an expense bill for the selected day or month',()=>{
+  const s=initialState();
+  const html=expenseBillHtml({
+   settings:s.settings,
+   periodLabel:'Day · Today',
+   expenses:[{category:'Grocery',note:'Vegetables, Spices',amount:12000,date:'2026-11-11'},{category:'Oil',note:'Cooking Oil 1 L',amount:8000,date:'2026-11-11'}],
+   sales:78000,
+   expenseTotal:20000,
+   net:58000,
+   printedAt:'2026-11-11T13:10:29.000Z'
+  });
+  expect(html).toContain('THE CHEF WARRIORS');
+  expect(html).toContain('EXPENSE BILL');
+  expect(html).toContain('Day · Today');
+  expect(html).toContain('S.NO');
+  expect(html).toContain('ITEM / CATEGORY');
+  expect(html).toContain('Grocery');
+  expect(html).toContain('Vegetables, Spices');
+  expect(html).toContain('TOTAL EXPENSES');
+  expect(html).toContain('TOTAL SALES');
+  expect(html).toContain('NET PROFIT');
+  expect(html).toContain('Thank you. Visit us again!');
+  expect(html).not.toContain('<script>');
+ });
  it('keeps discount and tax on the customer bill when they apply',()=>{const s=initialState();s.settings.taxRate=5;const o=checkout(s,admin,{...input(),discount:4000},true);const html=receiptHtml(o,'counter');expect(html).toContain('Discount');expect(html).toContain('Tax (5%)');expect(html).toContain('TOTAL');});
  it('excludes cancellations and reconciles payments',()=>{const s=initialState();const a=checkout(s,admin,input(),true);checkout(s,admin,{...input(),payment:'UPI'},true);cancel(s,admin,a.id,'Customer changed mind');const r=report(s.orders);expect(r.sales).toBe(12000);expect(r.cancelled).toBe(12000);expect(r.payments.reduce((sum,p)=>sum+p.total,0)).toBe(r.sales);});
  it('enforces service permissions and required reasons',()=>{const s=initialState(),o=checkout(s,cashier,input(),true);expect(()=>cancel(s,cashier,o.id,'Reason')).toThrow();expect(()=>cancel(s,admin,o.id,'')).toThrow();expect(()=>saveItem(s,cashier,s.items[0])).toThrow();expect(()=>saveSettings(s,cashier,s.settings)).toThrow();});
@@ -47,6 +71,46 @@ describe('billing rules',()=>{
   expect(first.token).toBe('01');expect(second.token).toBe('01');
   expect(first.dailyToken).toBe(1);expect(second.dailyToken).toBe(2);
   expect(s.sequence).toBe(1002);
+ });
+ it('heals a lagging invoice sequence so checkout never reuses a bill number',()=>{
+  const s=initialState();
+  const first=checkout(s,admin,input(),true);
+  expect(first.reference).toBe('CW-1001');
+  s.sequence=1000;
+  const next=checkout(s,admin,{...input(),key:crypto.randomUUID()},true);
+  expect(next.reference).toBe('CW-1002');
+  expect(s.sequence).toBe(1002);
+ });
+ it('amends a paid bill quantity without changing invoice number or breaking cancel',()=>{
+  const s=initialState();
+  const order=checkout(s,admin,input(),true);
+  expect(order.lines[0].qty).toBe(2);
+  const beforeJobs=s.jobs.length;
+  const corrected=amendOrder(s,admin,{id:order.id,reason:'Customer wants 1 instead of 2',lines:[{keepIndex:0,qty:1}]},true);
+  expect(corrected.reference).toBe(order.reference);
+  expect(corrected.lines).toHaveLength(1);
+  expect(corrected.lines[0].qty).toBe(1);
+  expect(corrected.totals.total).toBe(6000);
+  expect(corrected.amendedAt).toBeTruthy();
+  expect(s.jobs.length).toBe(beforeJobs+2);
+  expect(()=>amendOrder(s,cashier,{id:order.id,reason:'No',lines:[{keepIndex:0,qty:1}]},true)).toThrow(/Administrator/);
+  cancel(s,admin,order.id,'Customer left');
+  expect(order.state).toBe('cancelled');
+  expect(()=>amendOrder(s,admin,{id:order.id,reason:'Too late',lines:[{keepIndex:0,qty:1}]},true)).toThrow(/paid bill/);
+ });
+ it('amends a paid bill by replacing an item and changing payment',()=>{
+  const s=initialState();
+  const order=checkout(s,admin,{...input(),payment:'UPI',tendered:0},true);
+  const replacement=s.items.find(item=>item.id!==order.lines[0].id&&item.available&&!(item.options||[]).length)!;
+  const corrected=amendOrder(s,admin,{id:order.id,reason:'Replaced item and switched to Cash',payment:'Cash',lines:[{id:replacement.id,qty:1}]},true);
+  expect(corrected.reference).toBe(order.reference);
+  expect(corrected.payment).toBe('Cash');
+  expect(corrected.lines).toHaveLength(1);
+  expect(corrected.lines[0].id).toBe(replacement.id);
+  expect(corrected.lines[0].qty).toBe(1);
+  expect(corrected.totals.total).toBe(replacement.price);
+  expect(corrected.tendered).toBeGreaterThanOrEqual(corrected.totals.total);
+  expect(corrected.change).toBe(corrected.tendered-corrected.totals.total);
  });
  it('resets the daily token each local day and keeps the monthly order total',()=>{
   const s=initialState(),first=checkout(s,admin,input(),true);
@@ -98,5 +162,13 @@ describe('billing rules',()=>{
   deleteExpense(s,admin,expense.id);
   expect(s.expenses).toHaveLength(0);
   expect(monthlyPnL(s.orders,s.expenses,month).net).toBe(12000);
+ });
+ it('computes day-wise sales minus expenses with today-style empty other days',()=>{
+  const s=initialState(),order=checkout(s,admin,input(),true);
+  const day=localDate(order.created);
+  const expense={id:crypto.randomUUID(),date:day,amount:2000,category:'Gas'};
+  saveExpense(s,admin,expense);
+  expect(dailyPnL(s.orders,s.expenses,day)).toEqual({day,sales:12000,expenses:2000,net:10000});
+  expect(dailyPnL(s.orders,s.expenses,'2000-01-01')).toEqual({day:'2000-01-01',sales:0,expenses:0,net:0});
  });
 });

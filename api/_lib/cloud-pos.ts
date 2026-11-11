@@ -1,7 +1,7 @@
 import {randomBytes,scryptSync,timingSafeEqual} from 'node:crypto';
 import {z} from 'zod';
 import * as engine from '../../src/application/engine';
-import {checkoutSchema,expenseSchema,itemSchema,normalizeExpenses,settingsSchema,type Session,type State} from '../../src/domain/model';
+import {amendOrderSchema,checkoutSchema,expenseSchema,highestBillNumber,itemSchema,normalizeExpenses,settingsSchema,type Session,type State} from '../../src/domain/model';
 import {initialState} from '../../src/domain/seed';
 import {readSupabaseEnv,sb,sbOptional,type SupabaseEnv} from './supabase';
 
@@ -78,6 +78,7 @@ async function loadState(env:SupabaseEnv):Promise<State>{
   jobs:parsedJobs,
   audit:[]
  };
+ state.sequence=highestBillNumber(state.orders,state.sequence);
  return state;
 }
 
@@ -174,6 +175,17 @@ export async function invokeCloudPos(method:string,args:unknown[],session:Sessio
    await saveMeta(env,state,Number(metaRows[0]?.revision||1)+1);
    await upsertOrder(env,order);
    return {result:undefined,session};
+  }
+  case 'amendOrder':{
+   const actor=authed();
+   const input=amendOrderSchema.parse(args[0]);
+   const state=await loadState(env);
+   const order=engine.amendOrder(state,actor,input,true);
+   const metaRows=await sb<MetaRow[]>(env,`pos_meta?id=eq.${encodeURIComponent(env.shopId)}&select=revision`);
+   await saveMeta(env,state,Number(metaRows[0]?.revision||1)+1);
+   await upsertOrder(env,order);
+   await upsertJobs(env,state.jobs.filter(j=>j.orderId===order.id).slice(-2));
+   return {result:order,session};
   }
   case 'saveItem':{
    const actor=authed();

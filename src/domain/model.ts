@@ -8,8 +8,25 @@ export const settingsSchema=z.object({shop:z.string().trim().min(1).max(80),addr
 export type Settings=z.infer<typeof settingsSchema>;
 export const checkoutSchema=z.object({key:z.string().min(8).max(100),lines:z.array(z.object({id:z.string(),lineId:z.string().max(100).optional(),choices:z.record(z.string().max(60),z.string().max(60)).optional(),qty:z.number().int().min(1).max(999),notes:z.string().max(300)})).min(1).max(100),discount:z.number().int().min(0).max(100000000),type:z.enum(['Dine-in','Takeaway']),token:z.string().trim().min(1).max(40),payment:z.enum(['Cash','UPI','Card']),tendered:z.number().int().min(0).max(100000000),simulation:z.enum(['preview','kitchen-failure','both-fail','unknown']).optional()});
 export type Checkout=z.infer<typeof checkoutSchema>;
+/** Correct a paid bill: keep/replace lines, change qty, and optionally change payment. Same invoice number. */
+export const amendOrderSchema=z.object({
+ id:z.string().min(1),
+ reason:z.string().trim().min(1).max(300),
+ payment:z.enum(['Cash','UPI','Card']).optional(),
+ tendered:z.number().int().min(0).max(100000000).optional(),
+ lines:z.array(z.object({
+  keepIndex:z.number().int().min(0).max(99).optional(),
+  id:z.string().min(1).optional(),
+  qty:z.number().int().min(1).max(999),
+  choices:z.record(z.string().max(60),z.string().max(60)).optional(),
+  notes:z.string().max(300).optional()
+ }).superRefine((row,ctx)=>{
+  if(row.keepIndex===undefined&&!row.id)ctx.addIssue({code:'custom',message:'Each line needs keepIndex or product id'});
+ })).min(1).max(100)
+});
+export type AmendOrder=z.infer<typeof amendOrderSchema>;
 export type Money={subtotal:number;discount:number;tax:number;rounding:number;total:number};
-export type Order={id:string;reference:string;key:string;created:string;state:'paid'|'cancelled';reason?:string;type:Checkout['type'];token:string;dailyToken?:number;payment:Checkout['payment'];tendered:number;change:number;lines:(Item & {qty:number;notes:string})[];totals:Money;settings:Settings};
+export type Order={id:string;reference:string;key:string;created:string;state:'paid'|'cancelled';reason?:string;amendedAt?:string;amendReason?:string;type:Checkout['type'];token:string;dailyToken?:number;payment:Checkout['payment'];tendered:number;change:number;lines:(Item & {qty:number;notes:string})[];totals:Money;settings:Settings};
 export type Job={id:string;orderId:string;kind:'counter'|'kitchen';state:'queued'|'submitting'|'submitted'|'failed'|'unknown'|'preview';printer:string;copy:boolean;reason:string;attempts:{at:string;outcome:string}[]};
 export type Role='admin'|'cashier';
 export const expenseSchema=z.object({id:z.string().min(1),date:z.string().regex(/^\d{4}-\d{2}-\d{2}$/,'Use YYYY-MM-DD'),amount:z.number().int().min(1).max(100000000),category:z.string().trim().min(1).max(40),note:z.string().trim().max(200).optional()});
@@ -128,11 +145,31 @@ export function monthlyOrderTotals(orders:Pick<Order,'created'>[]){
  for(const order of orders){const month=localMonth(order.created),row=map.get(month)||{month,count:0};row.count++;map.set(month,row);}
  return [...map.values()].sort((a,b)=>b.month.localeCompare(a.month));
 }
+/** Highest CW-#### bill number already used, or the stored sequence floor. */
+export function highestBillNumber(orders:Pick<Order,'reference'>[],sequence=1000){
+ let max=Number.isInteger(sequence)?sequence:1000;
+ for(const order of orders){
+  const match=/^CW-(\d+)$/i.exec(String(order.reference||''));
+  if(match)max=Math.max(max,Number(match[1]));
+ }
+ return max;
+}
+/** Next unique invoice reference. Heals a lagging sequence after sync/restore. */
+export function nextBillReference(state:Pick<State,'orders'|'sequence'>){
+ state.sequence=highestBillNumber(state.orders,state.sequence)+1;
+ return `CW-${state.sequence}`;
+}
 /** Calendar-month P&L. Only the selected month counts — a new month starts at 0 for sales/expenses/net. */
 export function monthlyPnL(orders:Pick<Order,'created'|'state'|'totals'>[],expenses:Pick<Expense,'date'|'amount'>[],month:string){
  const sales=orders.filter(o=>o.state==='paid'&&localMonth(o.created)===month).reduce((sum,o)=>sum+o.totals.total,0);
  const expenseTotal=expenses.filter(e=>e.date.slice(0,7)===month).reduce((sum,e)=>sum+e.amount,0);
  return {month,sales,expenses:expenseTotal,net:sales-expenseTotal};
+}
+/** Calendar-day P&L. Only the selected date counts — each new day starts at 0. */
+export function dailyPnL(orders:Pick<Order,'created'|'state'|'totals'>[],expenses:Pick<Expense,'date'|'amount'>[],day:string){
+ const sales=orders.filter(o=>o.state==='paid'&&localDate(o.created)===day).reduce((sum,o)=>sum+o.totals.total,0);
+ const expenseTotal=expenses.filter(e=>e.date===day).reduce((sum,e)=>sum+e.amount,0);
+ return {day,sales,expenses:expenseTotal,net:sales-expenseTotal};
 }
 export function normalizeExpenses(value:unknown):Expense[]{
  if(!Array.isArray(value))return [];

@@ -2,7 +2,7 @@ import {createHash} from 'node:crypto';
 import type {DatabaseSync} from 'node:sqlite';
 import type {Store} from '../database/store';
 import type {Expense,Order,State} from '../../src/domain/model';
-import {expenseSchema,itemSchema,normalizeExpenses,settingsSchema} from '../../src/domain/model';
+import {expenseSchema,highestBillNumber,itemSchema,normalizeExpenses,settingsSchema} from '../../src/domain/model';
 import {SupabaseRestClient} from './client';
 import type {SupabaseSyncConfig} from './config';
 
@@ -203,6 +203,7 @@ export function createCloudSync(store:Store,config:SupabaseSyncConfig,client=new
       if(Number.isInteger(payload.sequence))s.sequence=Math.max(s.sequence,Number(payload.sequence));
      }catch{/* ignore invalid remote meta */}
     }
+    s.sequence=highestBillNumber(s.orders,s.sequence);
    });
 
    for(const user of remoteUsers){

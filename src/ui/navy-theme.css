@@ -4,7 +4,10 @@
 .shell .workspace{background:#07151f}
 .shell .panel,.shell .dashboard-panel{background:linear-gradient(130deg,#0c1c29,#0a1823);border-color:var(--border)}
 .shell button,.shell input,.shell select,.shell textarea{border-color:#29404f}
-.shell button:not(.primary):not(.selected):not(.add){background-color:#142735}
+.shell button:not(.primary):not(.selected):not(.add){background-color:#142735;color:#eef4f8}
+.shell .orders-filters button:not(.primary):not(.selected):not(.add){background-color:#201d16;color:#f5efd8}
+.shell .orders-filters button:not(.primary):not(.selected):not(.add):hover{background-color:#3a3424;color:#fffdf0}
+.shell .orders-filters button.active{background-color:#ffdc00;color:#201b07}
 .shell input,.shell select,.shell textarea{background:#102330;color:#eff5f8}
 .shell .primary,.shell .selected,.shell .add{background:linear-gradient(110deg,#ffda73,#ffca4e)!important;border-color:#f2c354!important;color:#12232b!important}
 .shell .primary:hover:not(:disabled),.shell .add:hover{background:#ffe18a!important}
