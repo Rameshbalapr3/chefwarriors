@@ -736,8 +736,10 @@ label .ui-select{margin-top:.35em}
 .settings-extra-actions{display:flex;flex-wrap:wrap;gap:.55em}
 .settings-extra-actions button{min-height:44px;font-weight:650;background:#201d16;border-color:#3c3423;color:#f5efd8}
 .settings-extra-actions button:hover:not(:disabled){background:#3a3424;border-color:#c4a832;color:#fffdf0}
-.settings-cashier{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:.65em;align-items:end}
-.settings-cashier button{min-height:48px;font-weight:700;white-space:nowrap;background:#201d16;border-color:#3c3423;color:#f5efd8}
+.settings-cashier{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:.75em;align-items:end;min-width:0}
+.settings-cashier label{min-width:0;display:grid;gap:.4em}
+.settings-cashier input{width:100%;min-width:0;max-width:100%}
+.settings-cashier button{grid-column:1/-1;width:100%;min-height:48px;font-weight:700;white-space:nowrap;background:#201d16;border-color:#3c3423;color:#f5efd8}
 .settings-cashier button:hover:not(:disabled){background:#3a3424;border-color:#c4a832;color:#fffdf0}
 @media(max-width:1000px){
  .settings-pos-grid,.settings-extra{grid-template-columns:minmax(0,1fr)}

@@ -114,11 +114,12 @@ export function App(){
     <section className="settings-card">
      <h2>Cashier login</h2>
      <p className="settings-note">Signed in as <b>{session.username}</b> · Admin</p>
-     <form className="settings-cashier" onSubmit={e=>{e.preventDefault();const f=new FormData(e.currentTarget);void act(()=>unwrap(api.addUser(String(f.get('username')),String(f.get('password')))),'Cashier account created');e.currentTarget.reset();}}>
-      <label>Username<input name="username" required minLength={3} autoComplete="off"/></label>
-      <label>Password<input name="password" type="password" required minLength={12} autoComplete="new-password"/></label>
+     <form className="settings-cashier" onSubmit={e=>{e.preventDefault();const f=new FormData(e.currentTarget);void act(()=>unwrap(api.addUser(String(f.get('username')).trim(),String(f.get('password')))),'Cashier account created');e.currentTarget.reset();}}>
+      <label>Username<input name="username" required minLength={3} maxLength={40} pattern="[A-Za-z0-9_.\-]{3,40}" title="3–40 characters: letters, numbers, . _ -" autoComplete="off" placeholder="e.g. cashier1"/></label>
+      <label>Password<input name="password" type="password" required minLength={12} maxLength={128} title="At least 12 characters" autoComplete="new-password" placeholder="Min. 12 characters"/></label>
       <button type="submit">Add cashier</button>
      </form>
+     <p className="settings-note">Username: 3–40 letters/numbers · Password: at least 12 characters</p>
     </section>
    </div>
   </>:<div className="empty"><ShieldCheck/><h2>Admin access required</h2><p>Settings are restricted to administrators.</p></div>}
