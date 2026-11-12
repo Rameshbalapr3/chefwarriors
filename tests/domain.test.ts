@@ -13,7 +13,28 @@ describe('billing rules',()=>{
  it('rejects empty carts and underpaid cash',()=>{const s=initialState();expect(()=>checkout(s,admin,{...input(),lines:[]},true)).toThrow();expect(()=>checkout(s,admin,{...input(),tendered:0},true)).toThrow();expect(s.orders).toHaveLength(0);});
  it('keeps historical price and shop snapshots',()=>{const s=initialState(),o=checkout(s,admin,input(),true);saveItem(s,admin,{...s.items[0],price:90000});saveSettings(s,admin,{...s.settings,shop:'New name'});expect(o.lines[0].price).toBe(6000);expect(o.settings.shop).toBe('The Chef Warriors');});
  it('produces price-free kitchen payload and escapes receipt content',()=>{const s=initialState();s.items[0].name='<script>Bad</script>';const o=checkout(s,admin,input(),true),kot=JSON.stringify(kitchenTicket(o));for(const word of ['price','tax','total','discount','payment','tendered'])expect(kot).not.toContain(word);const html=receiptHtml(o,'kitchen');expect(html).not.toContain('<script>');expect(html).not.toContain('₹');expect(html).toContain(o.reference);expect(html).toContain('No onions');});
- it('prints a customer bill with shop header, order number and no zero clutter',()=>{const s=initialState();const o=checkout(s,admin,input(),true);const html=receiptHtml(o,'counter');expect(html).toContain('THE CHEF WARRIORS');expect(html).toContain(`ORDER NO : ${o.reference}`);expect(html).toContain('>ITEM<');expect(html).toContain('>QTY<');expect(html).toContain('class="qty">2<');expect(html).toContain('SUBTOTAL');expect(html).toContain('TOTAL');expect(html).toContain('Thank you. Visit us again!');expect(html).not.toContain('Discount');expect(html).not.toContain('Tax (');expect(html).not.toContain('Cash recorded');expect(html).not.toContain('<script>');});
+ it('prints a customer bill with shop header, order number, service type and no zero clutter',()=>{
+  const s=initialState();
+  const takeaway=checkout(s,admin,input(),true);
+  const takeawayHtml=receiptHtml(takeaway,'counter');
+  expect(takeawayHtml).toContain('THE CHEF WARRIORS');
+  expect(takeawayHtml).toContain(`ORDER NO : ${takeaway.reference}`);
+  expect(takeawayHtml).toContain('TAKEAWAY');
+  expect(takeawayHtml).toContain('>ITEM<');
+  expect(takeawayHtml).toContain('>QTY<');
+  expect(takeawayHtml).toContain('class="qty">2<');
+  expect(takeawayHtml).toContain('SUBTOTAL');
+  expect(takeawayHtml).toContain('TOTAL');
+  expect(takeawayHtml).toContain('Thank you. Visit us again!');
+  expect(takeawayHtml).not.toContain('Discount');
+  expect(takeawayHtml).not.toContain('Tax (');
+  expect(takeawayHtml).not.toContain('Cash recorded');
+  expect(takeawayHtml).not.toContain('<script>');
+  const dineIn=checkout(s,admin,{...input(),key:crypto.randomUUID(),type:'Dine-in',token:'05'},true);
+  const dineInHtml=receiptHtml(dineIn,'counter');
+  expect(dineInHtml).toContain('DINE-IN · 05');
+  expect(dineInHtml).not.toContain('TAKEAWAY');
+ });
  it('marks admin-created bills with a lone * on the first line, including reprints',()=>{
   const s=initialState();
   const adminOrder=checkout(s,admin,input(),true);
