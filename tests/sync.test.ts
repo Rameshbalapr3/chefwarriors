@@ -46,6 +46,8 @@ describe('optional supabase sync',()=>{
    async getMeta(){return meta;},
    async listOrders(){return orders;},
    async listJobs(){return jobs;},
+   async listQueuedJobs(){return jobs.filter(j=>j.state==='queued');},
+   async listOrdersByIds(ids:string[]){return orders.filter(o=>ids.includes(o.id));},
    async listUsers(){return users;},
    async listExpenses(){return expenses;},
    ...overrides
@@ -144,6 +146,49 @@ describe('optional supabase sync',()=>{
    expect(client.calls).toContain('deleteOrders:1');
    expect(client.calls.some(c=>c.startsWith('deleteJobs:')&&c!=='deleteJobs:0')).toBe(true);
   }finally{
+   store?.close();
+   rmSync(dir,{recursive:true,force:true});
+  }
+ });
+
+ it('polls remote queued jobs and notifies once without downgrading local submitted state',async()=>{
+  const dir=mkdtempSync(join(tmpdir(),'cw-sync-queue-'));
+  let store:Store|undefined;
+  let sync:ReturnType<typeof createCloudSync>|undefined;
+  const remoteOrder=sampleOrder('remote-bill-1','CW-9001','remote-bill-key-1');
+  const queuedJob={
+   id:'remote-job-1',orderId:remoteOrder.id,kind:'counter' as const,state:'queued' as const,
+   printer:'Bill',copy:false,reason:'',attempts:[] as {at:string;outcome:string}[]
+  };
+  let remoteOrders=[{id:remoteOrder.id,reference:remoteOrder.reference,request_key:remoteOrder.key,payload:remoteOrder,updated_at:remoteOrder.created}];
+  let remoteJobs=[{id:queuedJob.id,order_id:queuedJob.orderId,kind:queuedJob.kind,state:queuedJob.state,payload:queuedJob,updated_at:remoteOrder.created}];
+  const seen:string[][]=[];
+  const client=mockClient({
+   async listOrders(){return remoteOrders;},
+   async listJobs(){return remoteJobs;},
+   async listQueuedJobs(){return remoteJobs.filter(j=>j.state==='queued');},
+   async listOrdersByIds(ids:string[]){return remoteOrders.filter(o=>ids.includes(o.id));}
+  });
+  try{
+   store=new Store(join(dir,'db.sqlite'));
+   store.addUser('manager','a-unique-long-password','admin');
+   sync=createCloudSync(store,{url:'https://example.supabase.co',serviceKey:'key',shopId:'default'},client,{
+    onQueuedJobs:ids=>seen.push([...ids])
+   });
+   store.onCommitted=()=>sync!.notifyLocalChange();
+   await sync.flushNow();
+   await sync.pollPrintQueue();
+   expect(store.read().jobs.some(j=>j.id==='remote-job-1'&&j.state==='queued')).toBe(true);
+   expect(seen).toEqual([['remote-job-1']]);
+
+   store.transaction(s=>{const j=s.jobs.find(j=>j.id==='remote-job-1')!;j.state='submitted';j.attempts.push({at:new Date().toISOString(),outcome:'ok'});});
+   await sync.flushNow(); // push submitted status so the queue poll is not skipped while dirty
+   remoteJobs=[{...remoteJobs[0],state:'queued',payload:{...queuedJob,state:'queued'}}];
+   await sync.pollPrintQueue();
+   expect(store.read().jobs.find(j=>j.id==='remote-job-1')?.state).toBe('submitted');
+   expect(seen).toHaveLength(1);
+  }finally{
+   sync?.stop();
    store?.close();
    rmSync(dir,{recursive:true,force:true});
   }

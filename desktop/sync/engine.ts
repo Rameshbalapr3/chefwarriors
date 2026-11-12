@@ -50,17 +50,49 @@ function fingerprint(payload:unknown){
  return createHash('sha256').update(JSON.stringify(payload)).digest('hex');
 }
 
-export type CloudSync={enabled:true;notifyLocalChange:()=>void;start:()=>void;stop:()=>void;flushNow:()=>Promise<void>}|{enabled:false;notifyLocalChange:()=>void;start:()=>void;stop:()=>void;flushNow:()=>Promise<void>};
+export type CloudSync={
+ enabled:boolean;
+ notifyLocalChange:()=>void;
+ start:()=>void;
+ stop:()=>void;
+ flushNow:()=>Promise<void>;
+ /** Pull only remote queued print jobs and notify the desktop worker. */
+ pollPrintQueue:()=>Promise<void>;
+};
+
+export type CloudSyncOptions={
+ onQueuedJobs?:(ids:string[])=>void;
+};
+
+const JOB_STATE_RANK:Record<State['jobs'][number]['state'],number>={
+ preview:0,
+ queued:1,
+ submitting:2,
+ failed:3,
+ unknown:3,
+ submitted:4
+};
+
+/** Never let a stale remote row downgrade a local print that already progressed. */
+function mergeJobState(existing:State['jobs'][number],incoming:State['jobs'][number]){
+ const existingRank=JOB_STATE_RANK[existing.state]??0;
+ const incomingRank=JOB_STATE_RANK[incoming.state]??0;
+ if(incomingRank<existingRank)return;
+ if(incomingRank===existingRank&&(incoming.attempts?.length||0)<(existing.attempts?.length||0))return;
+ Object.assign(existing,incoming);
+}
 
 export function createNoopCloudSync():CloudSync{
  const noop=async()=>{};
- return {enabled:false,notifyLocalChange(){},start(){},stop(){},flushNow:noop};
+ return {enabled:false,notifyLocalChange(){},start(){},stop(){},flushNow:noop,pollPrintQueue:noop};
 }
 
-export function createCloudSync(store:Store,config:SupabaseSyncConfig,client=new SupabaseRestClient(config)):CloudSync{
+export function createCloudSync(store:Store,config:SupabaseSyncConfig,client:SupabaseRestClient=new SupabaseRestClient(config),options:CloudSyncOptions={}):CloudSync{
  let timer:ReturnType<typeof setTimeout>|undefined;
  let interval:ReturnType<typeof setInterval>|undefined;
+ let queueInterval:ReturnType<typeof setInterval>|undefined;
  let running=false;
+ let queueRunning=false;
  let stopped=false;
  let applyingRemote=false;
 
@@ -147,8 +179,9 @@ export function createCloudSync(store:Store,config:SupabaseSyncConfig,client=new
   const removeExpenseIds=new Set([...knownExpenses].filter(id=>!remoteExpenseIds.has(id)));
 
   applyingRemote=true;
+  let newlyQueued:string[]=[];
   try{
-   store.transaction(s=>{
+   newlyQueued=store.transaction(s=>{
     if(removeOrderIds.size)s.orders=s.orders.filter(o=>!removeOrderIds.has(o.id));
     if(removeJobIds.size||removeOrderIds.size)s.jobs=s.jobs.filter(j=>!removeJobIds.has(j.id)&&!removeOrderIds.has(j.orderId));
     if(removeExpenseIds.size)s.expenses=normalizeExpenses(s.expenses).filter(e=>!removeExpenseIds.has(e.id));
@@ -170,14 +203,21 @@ export function createCloudSync(store:Store,config:SupabaseSyncConfig,client=new
     }
 
     const jobById=new Map(s.jobs.map(j=>[j.id,j]));
+    const queuedIds:string[]=[];
     for(const row of remoteJobs){
      const job=row.payload as State['jobs'][number];
      if(!job?.id||job.id!==row.id)continue;
      if(!s.orders.some(o=>o.id===job.orderId))continue;
      const existing=jobById.get(row.id);
-     if(existing){Object.assign(existing,job);continue;}
+     if(existing){
+      const previous=existing.state;
+      mergeJobState(existing,job);
+      if(previous!=='queued'&&existing.state==='queued')queuedIds.push(existing.id);
+      continue;
+     }
      s.jobs.push(job);
      jobById.set(job.id,job);
+     if(job.state==='queued')queuedIds.push(job.id);
     }
 
     const expenseById=new Map(normalizeExpenses(s.expenses).map(e=>[e.id,e]));
@@ -204,6 +244,7 @@ export function createCloudSync(store:Store,config:SupabaseSyncConfig,client=new
      }catch{/* ignore invalid remote meta */}
     }
     s.sequence=highestBillNumber(s.orders,s.sequence);
+    return queuedIds;
    });
 
    for(const user of remoteUsers){
@@ -232,6 +273,63 @@ export function createCloudSync(store:Store,config:SupabaseSyncConfig,client=new
   writeKnown(store.db,'expenses',remoteExpenseIds);
   const now=new Date().toISOString();
   store.db.prepare('UPDATE sync_cursor SET last_pull_at=?, last_remote_updated_at=COALESCE(?, last_remote_updated_at) WHERE id=1').run(now,remoteMeta?.updated_at||null);
+  if(newlyQueued.length)options.onQueuedJobs?.(newlyQueued);
+ }
+
+ async function runPrintQueuePoll(){
+  if(queueRunning||running||stopped)return;
+  const cursor=readCursor(store.db);
+  if(cursor.dirty)return;
+  queueRunning=true;
+  try{
+   const remoteJobs=await client.listQueuedJobs();
+   if(!remoteJobs.length)return;
+   const orderIds=[...new Set(remoteJobs.map(j=>j.order_id).filter(Boolean))];
+   const remoteOrders=await client.listOrdersByIds(orderIds);
+   applyingRemote=true;
+   let newlyQueued:string[]=[];
+   try{
+    newlyQueued=store.transaction(s=>{
+     const byId=new Map(s.orders.map(o=>[o.id,o]));
+     const byKey=new Map(s.orders.map(o=>[o.key,o]));
+     const byRef=new Map(s.orders.map(o=>[o.reference,o]));
+     for(const row of remoteOrders){
+      const order=row.payload as Order;
+      if(!order?.id||order.id!==row.id)continue;
+      const existing=byId.get(row.id);
+      if(existing){Object.assign(existing,order);continue;}
+      if(byKey.has(row.request_key)||byRef.has(row.reference))continue;
+      s.orders.unshift(order);
+      byId.set(order.id,order);byKey.set(order.key,order);byRef.set(order.reference,order);
+     }
+     const jobById=new Map(s.jobs.map(j=>[j.id,j]));
+     const queuedIds:string[]=[];
+     for(const row of remoteJobs){
+      const job=row.payload as State['jobs'][number];
+      if(!job?.id||job.id!==row.id)continue;
+      if(!s.orders.some(o=>o.id===job.orderId))continue;
+      const existing=jobById.get(row.id);
+      if(existing){
+       const previous=existing.state;
+       mergeJobState(existing,job);
+       if(previous!=='queued'&&existing.state==='queued')queuedIds.push(existing.id);
+       continue;
+      }
+      s.jobs.push(job);
+      jobById.set(job.id,job);
+      if(job.state==='queued')queuedIds.push(job.id);
+     }
+     return queuedIds;
+    });
+   }finally{
+    applyingRemote=false;
+   }
+   if(newlyQueued.length)options.onQueuedJobs?.(newlyQueued);
+  }catch(error){
+   console.warn('POS remote print queue deferred',error instanceof Error?error.message:error);
+  }finally{
+   queueRunning=false;
+  }
  }
 
  async function cycle(){
@@ -261,12 +359,16 @@ export function createCloudSync(store:Store,config:SupabaseSyncConfig,client=new
    stopped=false;
    schedule(1500);
    interval=setInterval(()=>{void cycle();},60000);
+   queueInterval=setInterval(()=>{void runPrintQueuePoll();},12000);
+   void runPrintQueuePoll();
   },
   stop(){
    stopped=true;
    if(timer)clearTimeout(timer);
    if(interval)clearInterval(interval);
+   if(queueInterval)clearInterval(queueInterval);
   },
-  async flushNow(){await cycle();}
+  async flushNow(){await cycle();},
+  async pollPrintQueue(){await runPrintQueuePoll();}
  };
 }

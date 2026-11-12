@@ -155,8 +155,8 @@ export async function invokeCloudPos(method:string,args:unknown[],session:Sessio
    const state=await loadState(env);
    const existing=state.orders.find(o=>o.key===input.key);
    if(existing)return {result:existing,session};
-   // Cloud mode uses preview print jobs (no local printer spooler).
-   const order=engine.checkout(state,actor,input,true);
+   // Queue real print jobs for the shop desktop worker (remote Dubai/web -> shop printer).
+   const order=engine.checkout(state,actor,input,false);
    const metaRows=await sb<MetaRow[]>(env,`pos_meta?id=eq.${encodeURIComponent(env.shopId)}&select=revision`);
    const revision=Number(metaRows[0]?.revision||1)+1;
    await saveMeta(env,state,revision);
@@ -180,11 +180,11 @@ export async function invokeCloudPos(method:string,args:unknown[],session:Sessio
    const actor=authed();
    const input=amendOrderSchema.parse(args[0]);
    const state=await loadState(env);
-   const order=engine.amendOrder(state,actor,input,true);
+   const order=engine.amendOrder(state,actor,input,false);
    const metaRows=await sb<MetaRow[]>(env,`pos_meta?id=eq.${encodeURIComponent(env.shopId)}&select=revision`);
    await saveMeta(env,state,Number(metaRows[0]?.revision||1)+1);
    await upsertOrder(env,order);
-   await upsertJobs(env,state.jobs.filter(j=>j.orderId===order.id).slice(-2));
+   await upsertJobs(env,state.jobs.filter(j=>j.orderId===order.id&&j.state==='queued').slice(-2));
    return {result:order,session};
   }
   case 'saveItem':{
@@ -244,11 +244,19 @@ export async function invokeCloudPos(method:string,args:unknown[],session:Sessio
    await upsertUser(env,{username,salt,hash:hashPassword(password,salt),role:'cashier',active:true});
    return {result:undefined,session};
   }
+  case 'print':{
+   const actor=authed();
+   const id=z.string().parse(args[0]);
+   const reason=z.string().max(300).optional().parse(args[1])||'';
+   const state=await loadState(env);
+   const job=engine.preparePrint(state,actor,id,reason);
+   await upsertJobs(env,state.jobs.filter(j=>j.id===job.id));
+   return {result:job,session};
+  }
   case 'printers':
-  case 'print':
   case 'testPrinter':
   case 'printExpenseBill':
-   throw Error('Printers are available only on the desktop POS.');
+   throw Error('Printers are available only on the desktop POS. Keep the shop desktop open for remote bill printing.');
   case 'backup':
   case 'restore':
    throw Error('Use Backup & recovery in the desktop POS for database export or restore.');

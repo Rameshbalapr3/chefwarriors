@@ -64,6 +64,13 @@ export class SupabaseRestClient{
  listJobs(){
   return this.request<RemoteJob[]>('pos_print_jobs?select=id,order_id,kind,state,payload,updated_at&order=updated_at.asc');
  }
+ listQueuedJobs(){
+  return this.request<RemoteJob[]>('pos_print_jobs?state=eq.queued&select=id,order_id,kind,state,payload,updated_at&order=updated_at.asc&limit=40');
+ }
+ listOrdersByIds(ids:string[]){
+  if(!ids.length)return Promise.resolve([] as RemoteOrder[]);
+  return this.request<RemoteOrder[]>(`pos_orders?id=in.(${this.inFilter(ids)})&select=id,reference,request_key,payload,updated_at`);
+ }
  listUsers(){
   return this.request<RemoteUser[]>('pos_users?select=username,salt,hash,role,active,updated_at');
  }

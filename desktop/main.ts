@@ -12,6 +12,7 @@ import {amendOrderSchema,checkoutSchema,expenseSchema,itemSchema,settingsSchema,
 import {expenseBillHtml} from '../src/domain/receipt';
 import {loadSyncEnv,readSupabaseSyncConfig} from './sync/config';
 import {createCloudSync,createNoopCloudSync,type CloudSync} from './sync/engine';
+import {SupabaseRestClient} from './sync/client';
 if(!app.isPackaged&&process.env.POS_TEST_DATA)app.setPath('userData',process.env.POS_TEST_DATA);
 let store:Store,win:BrowserWindow,maintenance=false,databaseClosed=false;const activePrints=new Set<string>();let failedLogins=0,lockedUntil=0;
 let cloudSync:CloudSync=createNoopCloudSync();
@@ -25,7 +26,57 @@ function backupName(label:string){return join(app.getPath('userData'),'backups',
 function productPhotoPaths(itemId:string){const safe=`${itemId.replace(/[^a-zA-Z0-9_-]/g,'_').slice(0,80)||'item'}.jpg`;const folder=join(app.getPath('userData'),'product-photos');return {folder,fileName:safe,relative:`product-photos/${safe}`,absolute:join(folder,safe)};}
 const itemSaveSchema=itemSchema.omit({photo:true}).extend({photo:z.string().max(400000).optional()});
 function persistProductPhoto(itemId:string,photo:string|undefined){const paths=productPhotoPaths(itemId);mkdirSync(paths.folder,{recursive:true});if(photo?.startsWith('data:image/')){const comma=photo.indexOf(',');if(comma<0)throw Error('Invalid photo data');writeFileSync(paths.absolute,Buffer.from(photo.slice(comma+1),'base64'));return paths.relative;}if(photo?.startsWith('product-photos/')&&/^product-photos\/[a-zA-Z0-9_.-]+\.jpg$/.test(photo)){if(photo!==paths.relative&&existsSync(join(paths.folder,photo.slice('product-photos/'.length)))){/* keep existing shared name */}return photo;}if(existsSync(paths.absolute))unlinkSync(paths.absolute);return undefined;}
-async function printJob(id:string,reason=''):Promise<Job>{const actor=auth();if(maintenance)throw Error('Database maintenance is in progress');let job=store.transaction(s=>engine.preparePrint(s,actor,id,reason));if(activePrints.has(job.id))throw Error('Already submitting');activePrints.add(job.id);try{const order=store.read().orders.find(o=>o.id===job.orderId)!;store.transaction(s=>{const j=s.jobs.find(j=>j.id===job.id)!;j.printer=s.settings[j.kind];j.state='submitting';j.attempts.push({at:new Date().toISOString(),outcome:'submitting'});job=structuredClone(j);});const outcome=await dispatch(order,job);return store.transaction(s=>{const j=s.jobs.find(j=>j.id===job.id)!;j.state=outcome.state;j.attempts.push({at:new Date().toISOString(),outcome:outcome.detail});return j;});}finally{activePrints.delete(job.id);}}
+/** Sessionless submit for already-queued/failed jobs (local checkout + remote Dubai queue). */
+async function submitPrintJob(id:string):Promise<Job>{
+ if(maintenance)throw Error('Database maintenance is in progress');
+ if(activePrints.has(id))throw Error('Already submitting');
+ const current=store.read().jobs.find(j=>j.id===id);
+ if(!current)throw Error('Print job not found');
+ if(current.state!=='queued'&&current.state!=='failed')return structuredClone(current);
+ activePrints.add(id);
+ try{
+  let job=structuredClone(current);
+  const order=store.read().orders.find(o=>o.id===job.orderId);
+  if(!order)throw Error('Order not found');
+  store.transaction(s=>{
+   const j=s.jobs.find(j=>j.id===id);
+   if(!j||(j.state!=='queued'&&j.state!=='failed')){if(j)job=structuredClone(j);return;}
+   j.printer=s.settings[j.kind]||j.printer;
+   j.state='submitting';
+   j.attempts.push({at:new Date().toISOString(),outcome:'submitting'});
+   job=structuredClone(j);
+  });
+  if(job.state!=='submitting')return job;
+  const outcome=await dispatch(order,job);
+  return store.transaction(s=>{
+   const j=s.jobs.find(j=>j.id===id)!;
+   j.state=outcome.state;
+   j.attempts.push({at:new Date().toISOString(),outcome:outcome.detail});
+   return structuredClone(j);
+  });
+ }finally{activePrints.delete(id);}
+}
+async function printJob(id:string,reason=''):Promise<Job>{
+ const actor=auth();
+ if(maintenance)throw Error('Database maintenance is in progress');
+ const job=store.transaction(s=>engine.preparePrint(s,actor,id,reason));
+ return submitPrintJob(job.id);
+}
+function dispatchRemoteQueuedJobs(ids:string[]){
+ if(!ids.length||maintenance)return;
+ const jobs=store.read().jobs.filter(j=>ids.includes(j.id)&&j.state==='queued');
+ if(!jobs.length)return;
+ const byOrder=new Map<string,typeof jobs>();
+ for(const job of jobs){
+  const list=byOrder.get(job.orderId)||[];
+  list.push(job);
+  byOrder.set(job.orderId,list);
+ }
+ for(const list of byOrder.values()){
+  const printing=(async()=>{for(const job of list){try{await submitPrintJob(job.id);}catch{/* keep remaining jobs */}}})();
+  pendingPrints.add(printing);void printing.finally(()=>pendingPrints.delete(printing));
+ }
+}
 function register(){const handlers:Record<string,(...args:any[])=>unknown>={
  authStatus:()=>({setup:!store.hasUsers(),session:client().session}),
  login:(u,p,setup)=>{const username=z.string().max(40).parse(u),password=z.string().max(128).parse(p);if(Date.now()<lockedUntil)throw Error('Too many attempts. Wait one minute.');if(setup){if(store.hasUsers())throw Error('Administrator already configured');store.addUser(username,password,'admin');}try{client().session=store.login(username,password);failedLogins=0;return client().session;}catch(e){if(++failedLogins>=5){lockedUntil=Date.now()+60000;failedLogins=0;}throw e;}},
@@ -33,7 +84,7 @@ function register(){const handlers:Record<string,(...args:any[])=>unknown>={
  state:()=>{const actor=auth();const s=store.read();if(actor.role==='cashier')s.audit=[];return s;},
  checkout:async raw=>{const actor=auth(),input=checkoutSchema.parse(raw);const existing=store.read().orders.find(o=>o.key===input.key);if(existing)return existing;const order=store.transaction(s=>engine.checkout(s,actor,input,false));  const jobs=store.read().jobs.filter(j=>j.orderId===order.id);
   // Two customer bills share one printer, so they must print in order.
-  const printing=(async()=>{for(const job of jobs){try{await printJob(job.id);}catch{/* keep remaining jobs */}}})();
+  const printing=(async()=>{for(const job of jobs){try{await submitPrintJob(job.id);}catch{/* keep remaining jobs */}}})();
   pendingPrints.add(printing);void printing.finally(()=>pendingPrints.delete(printing));return order;},
  saveItem:raw=>{const incoming=itemSaveSchema.parse(raw);const photo=persistProductPhoto(incoming.id,incoming.photo);const item={...incoming,...(photo?{photo}:{})};if(!photo)delete (item as {photo?:string}).photo;return store.transaction(s=>engine.saveItem(s,auth(),itemSchema.parse(item)));},
  saveCategory:(raw,old)=>{admin();const name=z.string().trim().min(1).max(40).parse(raw),previous=z.string().max(40).optional().parse(old);store.transaction(s=>{if(s.categories.includes(name))throw Error('Category name already exists');if(previous){if(!s.categories.includes(previous))throw Error('Category not found');s.categories=s.categories.map(c=>c===previous?name:c);s.items.forEach(i=>{if(i.category===previous)i.category=name;});}else s.categories.push(name);engine.audit(s,auth(),'category',name);});},
@@ -41,7 +92,7 @@ function register(){const handlers:Record<string,(...args:any[])=>unknown>={
  saveExpense:raw=>store.transaction(s=>engine.saveExpense(s,auth(),expenseSchema.parse(raw))),
  deleteExpense:id=>store.transaction(s=>engine.deleteExpense(s,auth(),text.parse(id))),
  cancel:(id,reason)=>store.transaction(s=>engine.cancel(s,auth(),text.parse(id),text.parse(reason))),
- amendOrder:async raw=>{const actor=auth(),input=amendOrderSchema.parse(raw);const order=store.transaction(s=>engine.amendOrder(s,actor,input,false));const jobs=store.read().jobs.filter(j=>j.orderId===order.id&&j.state==='queued').slice(-2);const printing=(async()=>{for(const job of jobs){try{await printJob(job.id);}catch{/* keep remaining jobs */}}})();pendingPrints.add(printing);void printing.finally(()=>pendingPrints.delete(printing));return order;},
+ amendOrder:async raw=>{const actor=auth(),input=amendOrderSchema.parse(raw);const order=store.transaction(s=>engine.amendOrder(s,actor,input,false));const jobs=store.read().jobs.filter(j=>j.orderId===order.id&&j.state==='queued').slice(-2);const printing=(async()=>{for(const job of jobs){try{await submitPrintJob(job.id);}catch{/* keep remaining jobs */}}})();pendingPrints.add(printing);void printing.finally(()=>pendingPrints.delete(printing));return order;},
  printers:async()=>{admin();return (await win.webContents.getPrintersAsync()).map(p=>p.name);},
  print:(id,reason)=>printJob(text.parse(id),z.string().max(300).optional().parse(reason)),
  testPrinter:async raw=>{const actor=auth();engine.requireAdmin(actor);const kind=z.enum(['counter','kitchen']).parse(raw),s=store.read();const order={id:'test',reference:'TEST PRINT — NOT AN ORDER',key:'test-print',created:new Date().toISOString(),state:'paid' as const,type:'Takeaway' as const,token:'TEST ONLY',payment:'Cash' as const,tendered:0,change:0,lines:[{...s.items[0],name:'TEST ONLY — do not prepare',qty:1,price:0,notes:'Printer alignment and wrapping check'}],totals:{subtotal:0,discount:0,tax:0,rounding:0,total:0},settings:s.settings};const result=await dispatch(order,{id:'test',orderId:'test',kind,printer:s.settings[kind],copy:false,reason:'Labelled printer test',state:'queued',attempts:[]});store.transaction(s=>engine.audit(s,actor,'printer-test',kind,result.detail));if(result.state!=='submitted')throw Error(result.detail);return result.detail;},
@@ -81,7 +132,7 @@ if(!app.requestSingleInstanceLock())app.quit();else {
  app.whenReady().then(async()=>{const userData=app.getPath('userData');mkdirSync(join(userData,'backups'),{recursive:true});store=new Store(join(userData,'restaurant.sqlite'));
  loadSyncEnv([join(process.cwd(),'.env'),join(userData,'.env')]);
  const syncConfig=readSupabaseSyncConfig(userData);
- cloudSync=syncConfig?createCloudSync(store,syncConfig):createNoopCloudSync();
+ cloudSync=syncConfig?createCloudSync(store,syncConfig,new SupabaseRestClient(syncConfig),{onQueuedJobs:ids=>dispatchRemoteQueuedJobs(ids)}):createNoopCloudSync();
  store.onCommitted=()=>cloudSync.notifyLocalChange();
  if(cloudSync.enabled){cloudSync.notifyLocalChange();cloudSync.start();if(process.env.POS_TEST_DATA)console.info('POS cloud sync enabled');}
  if(process.env.POS_TEST_DATA)console.info('POS database opened');if(store.hasUsers()){if(process.env.POS_TEST_DATA)console.info('POS startup backup started');await store.backup(backupName('startup'));if(process.env.POS_TEST_DATA)console.info('POS startup backup completed');const files=readdirSync(join(userData,'backups')).filter(f=>f.startsWith('startup-')).sort();for(const name of files.slice(0,-10))unlinkSync(join(userData,'backups',name));}win=new BrowserWindow({width:1440,height:950,minWidth:1024,minHeight:768,backgroundColor:'#09151e',autoHideMenuBar:true,webPreferences:{preload:join(__dirname,'preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:true}});win.webContents.setWindowOpenHandler(()=>({action:'deny'}));win.webContents.on('will-navigate',e=>e.preventDefault());win.webContents.session.setPermissionRequestHandler((_w,_p,cb)=>cb(false));const invoke=register();try{mkdirSync(join(userData,'product-photos'),{recursive:true});browserServer=await startBrowserServer({root:join(__dirname,'../dist'),photoRoot:join(userData,'product-photos'),development:!app.isPackaged,port:!app.isPackaged&&process.env.POS_TEST_DATA&&process.env.POS_TEST_BROWSER_PORT?z.coerce.number().int().min(1024).max(65535).parse(process.env.POS_TEST_BROWSER_PORT):undefined,invoke});}catch(e){dialog.showErrorBox('Browser access unavailable',`Desktop billing is available, but the local browser server could not start: ${String(e)}`);}await win.loadFile(join(__dirname,'../dist/index.html'));}).catch(e=>{console.error('POS startup failed',e);dialog.showErrorBox('Cannot start Chef Warriors POS',String(e));app.quit();});
