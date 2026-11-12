@@ -8,6 +8,7 @@ import {AmendOrderModal} from './AmendOrderModal';
 import {SalesReports} from './SalesReports';
 import {Expenses} from './Expenses';
 import {SettingsForm} from './SettingsForm';
+import {AppUpdateCard} from './AppUpdateCard';
 import {ResponsiveSelect} from './ResponsiveSelect';
 import {browserServices} from '../adapters/browser/services';
 import {TAGLINE} from '../domain/catalog';
@@ -111,6 +112,7 @@ export function App(){
       <button type="button" disabled={api.mode==='browser'} onClick={()=>setReason({title:'Restore a database backup',action:async()=>{await unwrap(api.restore());setSession(null);setState(null);}})}>Restore</button>
      </div>
     </section>
+    <AppUpdateCard api={api} unwrap={unwrap} act={act}/>
     <section className="settings-card">
      <h2>Cashier login</h2>
      <p className="settings-note">Signed in as <b>{session.username}</b> · Admin</p>

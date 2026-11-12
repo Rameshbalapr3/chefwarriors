@@ -14,7 +14,23 @@ export type ExpenseBillPrint={
 };
 export interface PrinterService {printers():Promise<Result<string[]>>;print(jobId:string,reason?:string):Promise<Result<Job>>;testPrinter(kind:'counter'|'kitchen'):Promise<Result<string>>;printExpenseBill(input:ExpenseBillPrint):Promise<Result<string>>}
 export interface BackupService {backup():Promise<Result<string>>;restore():Promise<Result<string>>}
-export interface Services extends MenuRepository,BillingService,ReportService,SettingsRepository,PrinterService,BackupService {
+export type AppUpdateStatus={
+ supported:boolean;
+ currentVersion:string;
+ state:'idle'|'checking'|'available'|'not-available'|'downloading'|'ready'|'error';
+ availableVersion?:string;
+ progress?:number;
+ message?:string;
+};
+export interface UpdateService {
+ getUpdateStatus():Promise<Result<AppUpdateStatus>>;
+ checkForUpdate():Promise<Result<AppUpdateStatus>>;
+ downloadUpdate():Promise<Result<AppUpdateStatus>>;
+ installUpdate():Promise<Result<AppUpdateStatus>>;
+ /** Desktop preload only — live status while an update downloads. */
+ onUpdateStatus?:(callback:(status:AppUpdateStatus)=>void)=>()=>void;
+}
+export interface Services extends MenuRepository,BillingService,ReportService,SettingsRepository,PrinterService,BackupService,UpdateService {
  mode:'desktop'|'browser';authStatus():Promise<Result<{setup:boolean;session:Session|null}>>;login(username:string,password:string,setup?:boolean):Promise<Result<Session>>;logout():Promise<Result<void>>;switchRole(role:'admin'|'cashier'):Promise<Result<Session>>;reset():Promise<Result<void>>;addUser(username:string,password:string):Promise<Result<void>>;
 }
 declare global {interface Window {pos?:Services}}
