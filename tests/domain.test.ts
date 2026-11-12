@@ -14,6 +14,22 @@ describe('billing rules',()=>{
  it('keeps historical price and shop snapshots',()=>{const s=initialState(),o=checkout(s,admin,input(),true);saveItem(s,admin,{...s.items[0],price:90000});saveSettings(s,admin,{...s.settings,shop:'New name'});expect(o.lines[0].price).toBe(6000);expect(o.settings.shop).toBe('The Chef Warriors');});
  it('produces price-free kitchen payload and escapes receipt content',()=>{const s=initialState();s.items[0].name='<script>Bad</script>';const o=checkout(s,admin,input(),true),kot=JSON.stringify(kitchenTicket(o));for(const word of ['price','tax','total','discount','payment','tendered'])expect(kot).not.toContain(word);const html=receiptHtml(o,'kitchen');expect(html).not.toContain('<script>');expect(html).not.toContain('₹');expect(html).toContain(o.reference);expect(html).toContain('No onions');});
  it('prints a customer bill with shop header, order number and no zero clutter',()=>{const s=initialState();const o=checkout(s,admin,input(),true);const html=receiptHtml(o,'counter');expect(html).toContain('THE CHEF WARRIORS');expect(html).toContain(`ORDER NO : ${o.reference}`);expect(html).toContain('>ITEM<');expect(html).toContain('>QTY<');expect(html).toContain('class="qty">2<');expect(html).toContain('SUBTOTAL');expect(html).toContain('TOTAL');expect(html).toContain('Thank you. Visit us again!');expect(html).not.toContain('Discount');expect(html).not.toContain('Tax (');expect(html).not.toContain('Cash recorded');expect(html).not.toContain('<script>');});
+ it('marks admin-created bills with a lone * on the first line, including reprints',()=>{
+  const s=initialState();
+  const adminOrder=checkout(s,admin,input(),true);
+  const cashierOrder=checkout(s,cashier,{...input(),key:crypto.randomUUID()},true);
+  expect(adminOrder.adminSale).toBe(true);
+  expect(cashierOrder.adminSale).toBeUndefined();
+  const adminBill=receiptHtml(adminOrder,'counter');
+  const adminReprint=receiptHtml(adminOrder,'counter',true);
+  const adminKitchen=receiptHtml(adminOrder,'kitchen');
+  const cashierBill=receiptHtml(cashierOrder,'counter');
+  expect(adminBill).toMatch(/<body>\s*<p class="admin-mark">\*<\/p>/);
+  expect(adminReprint).toMatch(/<body>\s*<p class="admin-mark">\*<\/p>/);
+  expect(adminKitchen).toMatch(/<body>\s*<p class="admin-mark">\*<\/p>/);
+  expect(cashierBill).not.toContain('admin-mark');
+  expect(cashierBill).not.toMatch(/<body>\s*<p class="admin-mark">/);
+ });
  it('prints an expense bill for the selected day or month',()=>{
   const s=initialState();
   const html=expenseBillHtml({
@@ -27,6 +43,7 @@ describe('billing rules',()=>{
   });
   expect(html).toContain('THE CHEF WARRIORS');
   expect(html).toContain('EXPENSE BILL');
+  expect(html).toContain('@page{size:80mm auto;margin:0}');
   expect(html).toContain('Day · Today');
   expect(html).toContain('S.NO');
   expect(html).toContain('ITEM / CATEGORY');
@@ -35,7 +52,7 @@ describe('billing rules',()=>{
   expect(html).toContain('TOTAL EXPENSES');
   expect(html).toContain('TOTAL SALES');
   expect(html).toContain('NET PROFIT');
-  expect(html).toContain('Thank you. Visit us again!');
+  expect(html).not.toContain('Thank you. Visit us again!');
   expect(html).not.toContain('<script>');
  });
  it('keeps discount and tax on the customer bill when they apply',()=>{const s=initialState();s.settings.taxRate=5;const o=checkout(s,admin,{...input(),discount:4000},true);const html=receiptHtml(o,'counter');expect(html).toContain('Discount');expect(html).toContain('Tax (5%)');expect(html).toContain('TOTAL');});

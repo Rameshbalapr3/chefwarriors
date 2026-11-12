@@ -10,7 +10,7 @@ export function checkout(s:State,session:Session,raw:Checkout,demo:boolean):Orde
  const totals=calculate(lines,input.discount,s.settings.taxRate,s.settings.rounding);if(input.payment==='Cash'&&input.tendered<totals.total)throw Error('Cash received must cover the total');
  const created=new Date().toISOString(),dailyToken=nextDailyToken(s.orders,created);
  if(dailyTokenTaken(s.orders,localDate(created),dailyToken))throw Error('Daily token already used');
- const order:Order={id:crypto.randomUUID(),reference:nextBillReference(s),key:input.key,created,state:'paid',type:input.type,token:input.token,dailyToken,payment:input.payment,tendered:input.payment==='Cash'?input.tendered:totals.total,change:input.payment==='Cash'?input.tendered-totals.total:0,lines,totals,settings:structuredClone(s.settings)};
+ const order:Order={id:crypto.randomUUID(),reference:nextBillReference(s),key:input.key,created,state:'paid',type:input.type,token:input.token,dailyToken,payment:input.payment,tendered:input.payment==='Cash'?input.tendered:totals.total,change:input.payment==='Cash'?input.tendered-totals.total:0,lines,totals,settings:structuredClone(s.settings),...(session.role==='admin'?{adminSale:true}:{})};
  s.orders.unshift(order);
  // Two identical customer bills. Kitchen tickets are not created for new sales.
  const enqueue=(kind:'counter'|'kitchen',index=0)=>{let state:Job['state']=demo?'preview':'queued';if(demo&&input.simulation==='unknown')state='unknown';else if(demo&&(input.simulation==='both-fail'||(input.simulation==='kitchen-failure'&&index===1)))state='failed';s.jobs.push({id:crypto.randomUUID(),orderId:order.id,kind,state,printer:s.settings[kind],copy:false,reason:'',attempts:[]});};

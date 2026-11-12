@@ -26,7 +26,7 @@ export const amendOrderSchema=z.object({
 });
 export type AmendOrder=z.infer<typeof amendOrderSchema>;
 export type Money={subtotal:number;discount:number;tax:number;rounding:number;total:number};
-export type Order={id:string;reference:string;key:string;created:string;state:'paid'|'cancelled';reason?:string;amendedAt?:string;amendReason?:string;type:Checkout['type'];token:string;dailyToken?:number;payment:Checkout['payment'];tendered:number;change:number;lines:(Item & {qty:number;notes:string})[];totals:Money;settings:Settings};
+export type Order={id:string;reference:string;key:string;created:string;state:'paid'|'cancelled';reason?:string;amendedAt?:string;amendReason?:string;adminSale?:boolean;type:Checkout['type'];token:string;dailyToken?:number;payment:Checkout['payment'];tendered:number;change:number;lines:(Item & {qty:number;notes:string})[];totals:Money;settings:Settings};
 export type Job={id:string;orderId:string;kind:'counter'|'kitchen';state:'queued'|'submitting'|'submitted'|'failed'|'unknown'|'preview';printer:string;copy:boolean;reason:string;attempts:{at:string;outcome:string}[]};
 export type Role='admin'|'cashier';
 export const expenseSchema=z.object({id:z.string().min(1),date:z.string().regex(/^\d{4}-\d{2}-\d{2}$/,'Use YYYY-MM-DD'),amount:z.number().int().min(1).max(100000000),category:z.string().trim().min(1).max(40),note:z.string().trim().max(200).optional()});

@@ -9,7 +9,7 @@ export type ClientContext={session:Session|null;transport:'desktop'|'browser'};
 export const BROWSER_PORT=17373;
 export const BROWSER_URL=`http://127.0.0.1:${BROWSER_PORT}`;
 const COOKIE='cw_pos_session',TTL=8*60*60*1000,MAX_BODY=1024*1024; // allow product photo uploads (data URLs)
-const METHODS=new Set(['authStatus','login','logout','state','checkout','cancel','amendOrder','saveItem','saveCategory','saveSettings','saveExpense','deleteExpense','printers','print','testPrinter','addUser']);
+const METHODS=new Set(['authStatus','login','logout','state','checkout','cancel','amendOrder','saveItem','saveCategory','saveSettings','saveExpense','deleteExpense','printers','print','testPrinter','printExpenseBill','addUser']);
 type BrowserSession={context:ClientContext;expires:number};
 
 // Loopback only: this is the same-machine browser interface, not a LAN service.

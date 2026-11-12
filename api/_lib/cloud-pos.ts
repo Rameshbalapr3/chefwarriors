@@ -247,6 +247,7 @@ export async function invokeCloudPos(method:string,args:unknown[],session:Sessio
   case 'printers':
   case 'print':
   case 'testPrinter':
+  case 'printExpenseBill':
    throw Error('Printers are available only on the desktop POS.');
   case 'backup':
   case 'restore':

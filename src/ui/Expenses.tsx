@@ -3,6 +3,11 @@ import {ChevronDown,HandCoins,Printer,Trash2} from 'lucide-react';
 import {dailyPnL,localDate,localMonth,money,monthlyPnL,normalizeExpenses,type Expense,type Order,type Settings} from '../domain/model';
 import {expenseBillHtml} from '../domain/receipt';
 import {ResponsiveSelect} from './ResponsiveSelect';
+import {browserServices} from '../adapters/browser/services';
+import type {Result} from '../contracts/services';
+
+const api=window.pos||browserServices();
+async function unwrap<T>(result:Promise<Result<T>>){const value=await result;if(!value.ok)throw Error(value.error);return value.data;}
 
 const dayLabel=(value:string)=>new Date(`${value}T12:00:00`).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
 const monthLabel=(value:string)=>new Date(`${value}-01T12:00:00`).toLocaleDateString('en-IN',{month:'long',year:'numeric'});
@@ -92,16 +97,7 @@ export function Expenses({orders,expenses,settings,onSave,onDelete}:Props){
   finally{setBusy(false);}
  }
 
- function printBill(){
-  setError('');
-  const html=expenseBillHtml({
-   settings,
-   periodLabel:period==='day'?`Day · ${rangeLabel}`:`Month · ${rangeLabel}`,
-   expenses:listed,
-   sales:pnl.sales,
-   expenseTotal:pnl.expenses,
-   net:pnl.net
-  });
+ function browserBillFallback(html:string){
   const frame=document.createElement('iframe');
   frame.setAttribute('aria-hidden','true');
   frame.style.cssText='position:fixed;right:0;bottom:0;width:0;height:0;border:0;opacity:0;pointer-events:none';
@@ -116,6 +112,29 @@ export function Expenses({orders,expenses,settings,onSave,onDelete}:Props){
   };
   if(frame.contentDocument?.readyState==='complete')setTimeout(run,50);
   else frame.onload=run;
+ }
+
+ async function printBill(){
+  if(busy)return;
+  setError('');
+  const payload={
+   periodLabel:period==='day'?`Day · ${rangeLabel}`:`Month · ${rangeLabel}`,
+   expenses:listed,
+   sales:pnl.sales,
+   expenseTotal:pnl.expenses,
+   net:pnl.net
+  };
+  const html=expenseBillHtml({settings,...payload});
+  /* Desktop/local POS: silent print on the bill printer at 58/80mm. Browser-only cloud: dialog fallback. */
+  setBusy(true);
+  try{
+   await unwrap(api.printExpenseBill(payload));
+  }catch(e){
+   const message=e instanceof Error?e.message:'Expense bill could not print.';
+   /* Cloud / no desktop printer service: browser dialog with thermal CSS. Keep real printer errors visible. */
+   if(/Printers are available only on the desktop|Unknown POS action|Cannot reach the cloud|Cannot reach the local POS/i.test(message))browserBillFallback(html);
+   else setError(message);
+  }finally{setBusy(false);}
  }
 
  return <section className="expenses-pos">

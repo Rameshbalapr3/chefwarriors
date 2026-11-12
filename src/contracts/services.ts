@@ -4,7 +4,15 @@ export interface MenuRepository {saveItem(item:Item):Promise<Result<void>>;saveC
 export interface BillingService {checkout(input:Checkout):Promise<Result<Order>>;cancel(id:string,reason:string):Promise<Result<void>>;amendOrder(input:AmendOrder):Promise<Result<Order>>}
 export interface ReportService {state():Promise<Result<State>>}
 export interface SettingsRepository {saveSettings(settings:Settings):Promise<Result<void>>;saveExpense(expense:Expense):Promise<Result<void>>;deleteExpense(id:string):Promise<Result<void>>}
-export interface PrinterService {printers():Promise<Result<string[]>>;print(jobId:string,reason?:string):Promise<Result<Job>>;testPrinter(kind:'counter'|'kitchen'):Promise<Result<string>>}
+export type ExpenseBillPrint={
+ periodLabel:string;
+ expenses:Pick<Expense,'category'|'note'|'amount'|'date'>[];
+ sales:number;
+ expenseTotal:number;
+ net:number;
+ printedAt?:string;
+};
+export interface PrinterService {printers():Promise<Result<string[]>>;print(jobId:string,reason?:string):Promise<Result<Job>>;testPrinter(kind:'counter'|'kitchen'):Promise<Result<string>>;printExpenseBill(input:ExpenseBillPrint):Promise<Result<string>>}
 export interface BackupService {backup():Promise<Result<string>>;restore():Promise<Result<string>>}
 export interface Services extends MenuRepository,BillingService,ReportService,SettingsRepository,PrinterService,BackupService {
  mode:'desktop'|'browser';authStatus():Promise<Result<{setup:boolean;session:Session|null}>>;login(username:string,password:string,setup?:boolean):Promise<Result<Session>>;logout():Promise<Result<void>>;switchRole(role:'admin'|'cashier'):Promise<Result<Session>>;reset():Promise<Result<void>>;addUser(username:string,password:string):Promise<Result<void>>;

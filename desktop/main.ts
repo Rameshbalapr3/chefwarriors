@@ -6,9 +6,10 @@ import {AsyncLocalStorage} from 'node:async_hooks';
 import {startBrowserServer,type ClientContext} from './browser-server';
 import type {Result} from '../src/contracts/services';
 import {Store} from './database/store';
-import {dispatch} from './printing/printer';
+import {dispatch,printThermalHtml} from './printing/printer';
 import * as engine from '../src/application/engine';
 import {amendOrderSchema,checkoutSchema,expenseSchema,itemSchema,settingsSchema,type Session,type Job} from '../src/domain/model';
+import {expenseBillHtml} from '../src/domain/receipt';
 import {loadSyncEnv,readSupabaseSyncConfig} from './sync/config';
 import {createCloudSync,createNoopCloudSync,type CloudSync} from './sync/engine';
 if(!app.isPackaged&&process.env.POS_TEST_DATA)app.setPath('userData',process.env.POS_TEST_DATA);
@@ -44,6 +45,25 @@ function register(){const handlers:Record<string,(...args:any[])=>unknown>={
  printers:async()=>{admin();return (await win.webContents.getPrintersAsync()).map(p=>p.name);},
  print:(id,reason)=>printJob(text.parse(id),z.string().max(300).optional().parse(reason)),
  testPrinter:async raw=>{const actor=auth();engine.requireAdmin(actor);const kind=z.enum(['counter','kitchen']).parse(raw),s=store.read();const order={id:'test',reference:'TEST PRINT — NOT AN ORDER',key:'test-print',created:new Date().toISOString(),state:'paid' as const,type:'Takeaway' as const,token:'TEST ONLY',payment:'Cash' as const,tendered:0,change:0,lines:[{...s.items[0],name:'TEST ONLY — do not prepare',qty:1,price:0,notes:'Printer alignment and wrapping check'}],totals:{subtotal:0,discount:0,tax:0,rounding:0,total:0},settings:s.settings};const result=await dispatch(order,{id:'test',orderId:'test',kind,printer:s.settings[kind],copy:false,reason:'Labelled printer test',state:'queued',attempts:[]});store.transaction(s=>engine.audit(s,actor,'printer-test',kind,result.detail));if(result.state!=='submitted')throw Error(result.detail);return result.detail;},
+ printExpenseBill:async raw=>{
+  const actor=auth();engine.requireAdmin(actor);
+  const input=z.object({
+   periodLabel:z.string().trim().min(1).max(80),
+   expenses:z.array(z.object({category:z.string().max(40),note:z.string().max(200).optional(),amount:z.number().int().min(0).max(100000000),date:z.string().max(40)})).max(500),
+   sales:z.number().int().min(0).max(100000000),
+   expenseTotal:z.number().int().min(0).max(100000000),
+   net:z.number().int().min(-100000000).max(100000000),
+   printedAt:z.string().max(40).optional()
+  }).parse(raw);
+  const s=store.read();
+  if(!s.settings.counter)throw Error('Assign the bill printer in Settings before printing expenses.');
+  const html=expenseBillHtml({settings:s.settings,periodLabel:input.periodLabel,expenses:input.expenses,sales:input.sales,expenseTotal:input.expenseTotal,net:input.net,printedAt:input.printedAt});
+  const height=Math.max(140000,(input.expenses.length*14000)+160000);
+  const result=await printThermalHtml(html,s.settings.counter,s.settings.width,height);
+  store.transaction(state=>engine.audit(state,actor,'expense-print',input.periodLabel,result.detail));
+  if(result.state==='failed')throw Error(result.detail);
+  return result.detail;
+ },
  addUser:(u,p)=>{admin();store.addUser(z.string().parse(u),z.string().parse(p),'cashier');store.transaction(s=>engine.audit(s,auth(),'create-cashier',u));},
  backup:async()=>{admin();if(client().transport!=='desktop')throw Error('Use the desktop POS for backups');if(activePrints.size)throw Error('Wait for print submissions to finish');const result=await dialog.showSaveDialog(win,{title:'Export backup to an external device',defaultPath:`chefwarriors-${new Date().toISOString().slice(0,10)}.sqlite`,filters:[{name:'SQLite backup',extensions:['sqlite']}]});if(result.canceled||!result.filePath)throw Error('Backup cancelled');if(result.filePath===store.filename)throw Error('Choose an export destination outside the live database');if(activePrints.size)throw Error('Wait for print submissions to finish');maintenance=true;try{await store.backup(result.filePath);store.transaction(s=>engine.audit(s,auth(),'backup','database'));return 'Consistent backup exported';}finally{maintenance=false;}},
  restore:async()=>{admin();if(client().transport!=='desktop')throw Error('Use the desktop POS for restores');if(activePrints.size)throw Error('Wait for print submissions to finish');const chosen=await dialog.showOpenDialog(win,{title:'Restore validated database backup',properties:['openFile'],filters:[{name:'SQLite backup',extensions:['sqlite']}]});if(chosen.canceled||!chosen.filePaths[0])throw Error('Restore cancelled');if(activePrints.size)throw Error('Wait for print submissions to finish');maintenance=true;try{await store.restore(chosen.filePaths[0],backupName('pre-restore'));desktopClient.session=null;browserServer?.invalidateSessions();return 'Restored. Sign in using credentials from the backup.';}finally{maintenance=false;}}
