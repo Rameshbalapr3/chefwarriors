@@ -46,6 +46,7 @@
   "build": {
     "appId": "com.chefwarriors.pos",
     "productName": "Chef Warriors POS",
+    "artifactName": "chefwarriors-pos-setup-${version}.${ext}",
     "directories": {
       "output": "release"
     },
